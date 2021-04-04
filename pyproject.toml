@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "proj1"
+version = "0.1.0"
+description = "Coding project 1"
+authors = ["Evan Bluhm <embluhm@uw.edu>"]
+
+[tool.poetry.scripts]
+proj1 = "proj1:main"
+
+[tool.poetry.dependencies]
+python = "^3.6,<3.10"
+matplotlib = "^3.4.1"
+numpy = "^1.20.2"
+numba = "^0.53.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
