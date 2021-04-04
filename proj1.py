@@ -9,84 +9,126 @@ Upload your report in pdf format, source code, and run script/instructions.
 """
 import random
 import math
+import os
 
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
-import matplotlib.patches as mpatches
 from numba import jit
 
+###############################################################################
+# Settings
+###############################################################################
 
-# n = 128
-n = 16384
+plot_initial_distributions = True
+animate_phase_space = True  # Mutually exclusive with generating timeseries plots
+trace_particles = False
+
+
+# Number of particles
+n = 128
+# n = 512
+# n = 2048
+
+# Initial position distribution: uniform over [-2π, 2π]
+x_min = -2 * np.pi
+x_max = 2 * np.pi
+x_range = (x_min, x_max)
+# Initial velocity distribution: Maxwellian with FWHM=2
+# By definition, FWHM = 2*Sqrt(2*ln(2))σ ~ 2.355σ
+fwhm = 2.0
+v_min = -5.0
+v_max = 5.0
+v_range = (v_min, v_max)
+stdev = fwhm / 2.355
+initial_state = np.zeros((2, n))
+for i in range(n):
+    initial_state[0][i] = random.uniform(-2 * np.pi, 2 * np.pi)
+    initial_state[1][i] = max(min(random.gauss(0, stdev), 5), -5)
+current_state = initial_state
+
+# Time step and duration
 dt = 0.05
 t_max = 8 * np.pi
+t_steps = math.ceil(t_max/dt)
+frame = 0  # the current time step
 
-fwhm = 2.0
-x_range = (-2 * np.pi, 2 * np.pi)
-v_range = (-5.0, 5.0)
-# The FWHM in velocity should be 2.
-# FWHM = 2*Sqrt(2*ln(2))σ ~ 2.355σ
-stdev = fwhm / 2.355
+# Store the history of all particles
+history = np.zeros((t_steps, 2, n))
+
+# Calculate the kinetic energy at each timestep
+ke = np.zeros((t_steps, n))
 
 
+###############################################################################
+# Time step
+###############################################################################
 @jit(nopython=True)  # numba makes it fast!
-def time_step(state, dt):
+def time_step(state, frame, dt, history, ke):
     """Evolve state forward in time by dt with periodic boundary conditions."""
-    # do this the dummy way for now
     for i in np.arange(n):
-        # No collisions or forces
+        # No collisions or forces, just dx=v*dt
         state[0][i] += state[1][i] * dt
 
         # Apply boundary conditions
         if state[0][i] > 2 * np.pi:
             state[0][i] -= 4 * np.pi
         if state[0][i] < -2 * np.pi:
-            state[0][i] += +4 * np.pi
+            state[0][i] += 4 * np.pi
+        history[frame][0][i] = state[0][i]
+        history[frame][1][i] = state[1][i]
+    ke[frame] = 0.5*(np.square(state[1][i]))
+    frame += 1
     return state
 
 
-initial_state = np.zeros((2, n))
-for i in range(n):
-    # Initialize a randomly filled particle distribution that is Maxwellian in vx and is uniform in x.
-    initial_state[0][i] = random.uniform(-2 * np.pi, 2 * np.pi)
-    initial_state[1][i] = max(min(random.gauss(0, stdev), 5), -5)
-
-current_state = initial_state
-fig, ax = plt.subplots(figsize=(12, 10))
-(pt,) = plt.plot([], [], "r.", markersize=0.3)
-time_text = ax.text(0.02, 0.95, "", transform=ax.transAxes)
-
-
+###############################################################################
+# Animation code
+###############################################################################
 def init():
+    """Animation initialization."""
+    global ax, x_range, v_min, v_max
     ax.set_xlim(x_range)
-    ax.set_ylim(v_range[0]/2, v_range[1]/2)
+    ax.set_ylim(v_min, v_max)
     return (pt,)
 
 
 def update(frame):
-    time_step(current_state, dt=dt)
+    """Call every time we update animation frame."""
+    global current_state, dt, time_text, pt
+    time_step(current_state, frame=frame, dt=dt, history=history, ke=ke)
     current_time = frame * dt
     time_text.set_text(f"t = {current_time:.2f}")
     pt.set_data(current_state[0], current_state[1])
     return tuple([pt]) + tuple([time_text])
 
 
-ani = FuncAnimation(fig, update, frames=math.ceil(t_max / dt), init_func=init, blit=True, interval=1)
-plt.show()
-
-
-def main():
-    print(initial_state)
-    # plt.subplot(2, 2, 1)
-    # bins = math.ceil((x_range[1] - x_range[0]) / 0.025)
-    # plt.hist(initial_state[0], bins=bins, range=x_range)
-    # plt.title("Initial position distribution")
-    # plt.subplot(2, 2, 2)
-    # bins = math.ceil((v_range[1] - v_range[0]) / 0.025)
-    # plt.hist(initial_state[1], bins=bins, range=v_range)
-    # plt.title("Initial velocity distribution")
-    # plt.subplot(2, 2, (3, 4))
-    # plt.title("Phase space distribution")
-    # plt.plot(state[0], state[1], "r.")
-    # plt.show()
+###############################################################################
+# Main script
+###############################################################################
+"""Do the things."""
+if plot_initial_distributions:
+    print(f"Initial state: \n{initial_state}")
+    plt.figure()
+    plt.subplot(2, 2, 1)
+    plt.subplots_adjust(hspace=0.4)
+    bins = math.ceil((x_range[1] - x_range[0]) / 0.25)
+    plt.hist(initial_state[0], bins=bins, range=x_range)
+    plt.title("Initial position distribution")
+    plt.subplot(2, 2, 2)
+    bins = math.ceil((v_range[1] - v_range[0]) / 0.25)
+    plt.hist(initial_state[1], bins=bins, range=v_range)
+    plt.title("Initial velocity distribution")
+    plt.subplot(2, 2, (3, 4))
+    plt.title("Phase space distribution")
+    plt.plot(current_state[0], current_state[1], "k.", markersize=1)
+    fig_name = os.path.join("plots", "proj1", f"initial_hist_{n}_particles.pdf")
+    plt.savefig(fig_name)
+    print(f"Saved figure {os.path.join(os.getcwd(), fig_name)} to disk.")
+    plt.show()
+if animate_phase_space:
+    fig, ax = plt.subplots(figsize=(12, 10))
+    (pt,) = plt.plot([], [], "r.", markersize=0.3)
+    time_text = ax.text(0.02, 0.95, "", transform=ax.transAxes)
+    animation = FuncAnimation(fig, update, frames=t_steps, init_func=init, blit=True, interval=1)
+    plt.show()
