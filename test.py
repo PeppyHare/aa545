@@ -1,77 +1,151 @@
-import pandas as pd
-import random
-from itertools import count
-import time
+import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from mpl_toolkits import mplot3d
+import scipy.sparse as sp
+from scipy.sparse.linalg import spsolve
+from numba import jit
 
-med_path = "/Users/evan/Downloads/SalesJan2009.csv"
-med = pd.read_csv(med_path)
-sales = pd.DataFrame(med)
-ax = plt.gca()
-sales.plot(kind="line", y="Latitude", ax=ax, color="red")
-ax.set_xlabel("Index values")
-ax.set_ylabel("Latitude values")
-plt.title("Demo graph for Line plots")
-plt.show()
+"""
+Create Your Own Plasma PIC Simulation (With Python)
+Philip Mocz (2020) Princeton Univeristy, @PMocz
 
-plt.style.use("fivethirtyeight")
-x_values = []
-y_values = []
-z_values = []
-q_values = []
-counter = 0
-index = count()
+Simulate the 1D Two-Stream Instability
+Code calculates the motions of electron under the Poisson-Maxwell equation
+using the Particle-In-Cell (PIC) method
 
+"""
 
-def animate(i):
-
-    # print(counter)
-
-    x = next(index)  # counter or x variable -> index
-    counter = next(index)
-    print(counter)
-    x_values.append(x)
+@jit(nopython=True)
+def getAcc(pos, Nx, boxsize, n0, Gmtx, Lmtx):
     """
-    Three random value series ->
-    Y : 0-5
-    Z : 3-8
-    Q : 0-10
+    Calculate the acceleration on each particle due to electric field
+        pos      is an Nx1 matrix of particle positions
+        Nx       is the number of mesh cells
+        boxsize  is the domain [0,boxsize]
+        n0       is the electron number density
+        Gmtx     is an Nx x Nx matrix for calculating the gradient on the grid
+        Lmtx     is an Nx x Nx matrix for calculating the laplacian on the grid
+        a        is an Nx1 matrix of accelerations
     """
-    y = random.randint(0, 5)
-    z = random.randint(3, 8)
-    q = random.randint(0, 10)
-    # append values to keep graph dynamic
-    # this can be replaced with reading values from a csv files also
-    # or reading values from a pandas dataframe
-    y_values.append(y)
-    z_values.append(z)
-    q_values.append(q)
+    # Calculate Electron Number Density on the Mesh by
+    # placing particles into the 2 nearest bins (j & j+1, with proper weights)
+    # and normalizing
+    N = pos.shape[0]
+    dx = boxsize / Nx
+    j = np.floor(pos / dx).astype(int)
+    jp1 = j + 1
+    weight_j = (jp1 * dx - pos) / dx
+    weight_jp1 = (pos - j * dx) / dx
+    jp1 = np.mod(jp1, Nx)  # periodic BC
+    n = np.bincount(j[:, 0], weights=weight_j[:, 0], minlength=Nx)
+    n += np.bincount(jp1[:, 0], weights=weight_jp1[:, 0], minlength=Nx)
+    n *= n0 * boxsize / N / dx
 
-    if counter > 40:
-        """
-        This helps in keeping the graph fresh and refreshes values after every 40 timesteps
-        """
-        x_values.pop(0)
-        y_values.pop(0)
-        z_values.pop(0)
-        q_values.pop(0)
-        # counter = 0
-        plt.cla()  # clears the values of the graph
+    # Solve Poisson's Equation: laplacian(phi) = n-n0
+    phi_grid = spsolve(Lmtx, n - n0, permc_spec="MMD_AT_PLUS_A")
 
-    plt.plot(x_values, y_values, linestyle="--")
-    plt.plot(x_values, z_values, linestyle="--")
-    plt.plot(x_values, q_values, linestyle="--")
+    # Apply Derivative to get the Electric field
+    E_grid = -Gmtx @ phi_grid
 
-    ax.legend(["Value 1 ", "Value 2", "Value 3"])
-    ax.set_xlabel("X values")
-    ax.set_ylabel("Values for Three different variable")
-    plt.title("Dynamic line graphs")
+    # Interpolate grid value onto particle locations
+    E = weight_j * E_grid[j] + weight_jp1 * E_grid[jp1]
 
-    time.sleep(0.25)  # keep refresh rate of 0.25 seconds
+    a = -E
+
+    return a
 
 
-ani = FuncAnimation(plt.gcf(), animate, 1000)
-plt.tight_layout()
-plt.show()
+def main():
+    """ Plasma PIC simulation """
+
+    # Simulation parameters
+    N = 40000  # Number of particles
+    Nx = 400  # Number of mesh cells
+    t = 0  # current time of the simulation
+    tEnd = 50  # time at which simulation ends
+    dt = 1  # timestep
+    boxsize = 50  # periodic domain [0,boxsize]
+    n0 = 1  # electron number density
+    vb = 3  # beam velocity
+    vth = 1  # beam width
+    A = 0.1  # perturbation
+    plotRealTime = True  # switch on for plotting as the simulation goes along
+
+    # Generate Initial Conditions
+    np.random.seed(42)  # set the random number generator seed
+    # construct 2 opposite-moving Guassian beams
+    pos = np.random.rand(N, 1) * boxsize
+    vel = vth * np.random.randn(N, 1) + vb
+    Nh = int(N / 2)
+    vel[Nh:] *= -1
+    # add perturbation
+    vel *= 1 + A * np.sin(2 * np.pi * pos / boxsize)
+
+    # Construct matrix G to computer Gradient  (1st derivative)
+    dx = boxsize / Nx
+    e = np.ones(Nx)
+    diags = np.array([-1, 1])
+    vals = np.vstack((-e, e))
+    Gmtx = sp.spdiags(vals, diags, Nx, Nx)
+    Gmtx = sp.lil_matrix(Gmtx)
+    Gmtx[0, Nx - 1] = -1
+    Gmtx[Nx - 1, 0] = 1
+    Gmtx /= 2 * dx
+    Gmtx = sp.csr_matrix(Gmtx)
+
+    # Construct matrix L to computer Laplacian (2nd derivative)
+    diags = np.array([-1, 0, 1])
+    vals = np.vstack((e, -2 * e, e))
+    Lmtx = sp.spdiags(vals, diags, Nx, Nx)
+    Lmtx = sp.lil_matrix(Lmtx)
+    Lmtx[0, Nx - 1] = 1
+    Lmtx[Nx - 1, 0] = 1
+    Lmtx /= dx ** 2
+    Lmtx = sp.csr_matrix(Lmtx)
+
+    # calculate initial gravitational accelerations
+    acc = getAcc(pos, Nx, boxsize, n0, Gmtx, Lmtx)
+
+    # number of timesteps
+    Nt = int(np.ceil(tEnd / dt))
+
+    # prep figure
+    fig = plt.figure(figsize=(5, 4), dpi=80)
+
+    # Simulation Main Loop
+    for i in range(Nt):
+        # (1/2) kick
+        vel += acc * dt / 2.0
+
+        # drift (and apply periodic boundary conditions)
+        pos += vel * dt
+        pos = np.mod(pos, boxsize)
+
+        # update accelerations
+        acc = getAcc(pos, Nx, boxsize, n0, Gmtx, Lmtx)
+
+        # (1/2) kick
+        vel += acc * dt / 2.0
+
+        # update time
+        t += dt
+
+        # plot in real time - color 1/2 particles blue, other half red
+        if plotRealTime or (i == Nt - 1):
+            plt.cla()
+            plt.scatter(pos[0:Nh], vel[0:Nh], s=0.4, color="blue", alpha=0.5)
+            plt.scatter(pos[Nh:], vel[Nh:], s=0.4, color="red", alpha=0.5)
+            plt.axis([0, boxsize, -6, 6])
+
+            plt.pause(0.001)
+
+    # Save figure
+    plt.xlabel("x")
+    plt.ylabel("v")
+    plt.savefig("pic.png", dpi=240)
+    plt.show()
+
+    return 0
+
+
+if __name__ == "__main__":
+    main()

@@ -22,8 +22,9 @@ from utils import create_folder
 # Settings
 ###############################################################################
 
-plot_initial_distributions = 1
+plot_initial_distributions = 0
 animate_phase_space = 0  # Mutually exclusive with generating timeseries plots
+plot_snapshots = 0
 trace_particles = 1
 
 
@@ -54,22 +55,31 @@ frame = 0  # the current time step
 current_state = np.zeros((2, n))
 
 # Store the history of all particles
-history = np.zeros((t_steps, 2, n))
+history = np.zeros((2, n, t_steps))
 
 # Calculate the kinetic energy at each timestep
-ke = np.zeros((t_steps, n))
+ke = np.zeros((n, t_steps))
 
 
 def initialize_state():
     """Set initial positions of all particles."""
     global current_state
+    global history
+    global ke
     # Fixing random state for reproducibility
     random.seed("not really random")
     initial_state = np.zeros((2, n))
     for i in range(n):
-        initial_state[0][i] = random.uniform(-2 * np.pi, 2 * np.pi)
-        initial_state[1][i] = max(min(random.gauss(0, stdev), 5), -5)
+        initial_state[0][i] = random.uniform(x_min, x_max)
+        initial_state[1][i] = max(min(random.gauss(0, stdev), v_max), v_min)
     current_state = initial_state
+
+    # Re-initialize state history
+    history = np.zeros((2, n, t_steps))
+
+    # Re-initialize kinetic energy
+    ke = np.zeros((n, t_steps))
+
     return initial_state
 
 
@@ -88,9 +98,11 @@ def time_step(state, frame, dt, history, ke):
             state[0][i] -= 4 * np.pi
         if state[0][i] < -2 * np.pi:
             state[0][i] += 4 * np.pi
-        history[frame][0][i] = state[0][i]
-        history[frame][1][i] = state[1][i]
-    ke[frame] = 0.5 * (np.square(state[1][i]))
+
+        history[0][i][frame] += state[0][i]
+        history[1][i][frame] += state[1][i]
+
+    ke[:][frame] += 0.5 * (np.square(state[1][i]))
     frame += 1
     return state
 
@@ -125,7 +137,7 @@ if plot_initial_distributions:
     bin_width = 0.25
 
     fig1 = plt.figure()
-    plt.subplots_adjust(hspace=0.7)
+    # plt.subplots_adjust(hspace=0.7)
     fig1.suptitle(f"Initial distribution (n={n})")
 
     # Plot initial position histogram
@@ -151,7 +163,8 @@ if plot_initial_distributions:
     fig_name = os.path.join("plots", "proj1", f"initial_hist_{n}_particles.pdf")
     plt.savefig(fig_name)
     print(f"Saved figure {os.path.join(os.getcwd(), fig_name)} to disk.")
-    plt.show()
+    plt.tight_layout()
+    plt.show()  # Wait for user to close the plot
 
 if animate_phase_space:
     fig2, ax = plt.subplots(figsize=(12, 10))
@@ -163,7 +176,55 @@ if animate_phase_space:
 
     # Evolve positions until t_max. Animate particle positions in phase space.
     animation = FuncAnimation(fig2, update, frames=t_steps, init_func=init, blit=True, interval=1)
-    plt.show()
+    plt.show()  # Wait for user to close the plot
+
+if plot_snapshots:
+    initialize_state()
+    print("Simulating...")
+    for frame in range(t_steps):
+        time_step(current_state, frame=frame, dt=dt, history=history, ke=ke)
+    print("done!")
+
+    fig3 = plt.figure()
+    fig3.suptitle(f"Time Snapshots (n={n})")
+    ax_t0 = fig3.add_subplot(3, 1, 1)
+    ax_t0.set_ylabel("v")
+    plt.plot(history[0][0], history[0][1], "ko", markersize=1)
+
+    ax_t1 = fig3.add_subplot(3, 1, 2)
+    ax_t1.set_ylabel("v")
+    t1 = 2.0 * np.pi
+    frame_t1 = int(t1 / dt)
+    plt.plot(history[frame_t1][0], history[frame_t1][1], "ko", markersize=1)
+
+    ax_t2 = fig3.add_subplot(3, 1, 3)
+    ax_t2.set_ylabel("v")
+    ax_t0.set_xlabel("x")
+    t2 = 8.0 * np.pi
+    frame_t2 = int(t2 / dt)
+    plt.plot(history[frame_t2][0], history[frame_t2][1], "ko", markersize=1)
+    plt.tight_layout()
+
+    plt.show()  # Wait for user to close the plot
 
 if trace_particles:
+    t_max = 2 * np.pi
+    t_steps = t_steps = math.ceil(t_max / dt)
     initialize_state()
+    print("Simulating...")
+    for frame in range(t_steps):
+        time_step(current_state, frame=frame, dt=dt, history=history, ke=ke)
+    print("done!")
+    # try just plotting the first particle's trajectory
+    fig4 = plt.figure()
+    fig4.suptitle(f"Particle trajectories (n={n})")
+    ax4 = fig4.add_subplot(1, 1, 1)
+    for i in range(n):
+        position = history[0][i]
+        velocity = history[1][i]
+        ax4.plot(position, velocity, "o", markersize=1)
+        ax4.set_xlabel("x")
+        ax4.set_ylabel("y")
+    plt.show()
+
+if plot_
