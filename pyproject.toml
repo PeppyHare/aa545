@@ -5,7 +5,7 @@ description = "Coding project 1"
 authors = ["Evan Bluhm <embluhm@uw.edu>"]
 
 [tool.poetry.scripts]
-proj1 = "proj1:main"
+proj1 = "proj1:__main__"
 
 [tool.poetry.dependencies]
 python = "^3.6,<3.10"

@@ -16,13 +16,15 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from numba import jit
 
+from utils import create_folder
+
 ###############################################################################
 # Settings
 ###############################################################################
 
 plot_initial_distributions = 1
 animate_phase_space = 0  # Mutually exclusive with generating timeseries plots
-trace_particles = 0
+trace_particles = 1
 
 
 # Number of particles
@@ -42,20 +44,14 @@ v_max = 5.0
 v_range = (v_min, v_max)
 stdev = fwhm / 2.355
 
-
-# Fixing random state for reproducibility
-random.seed("not really random")
-initial_state = np.zeros((2, n))
-for i in range(n):
-    initial_state[0][i] = random.uniform(-2 * np.pi, 2 * np.pi)
-    initial_state[1][i] = max(min(random.gauss(0, stdev), 5), -5)
-current_state = initial_state
-
 # Time step and duration
 dt = 0.05
 t_max = 8 * np.pi
-t_steps = math.ceil(t_max/dt)
+t_steps = math.ceil(t_max / dt)
 frame = 0  # the current time step
+
+# Initialize arrays
+current_state = np.zeros((2, n))
 
 # Store the history of all particles
 history = np.zeros((t_steps, 2, n))
@@ -64,10 +60,23 @@ history = np.zeros((t_steps, 2, n))
 ke = np.zeros((t_steps, n))
 
 
+def initialize_state():
+    """Set initial positions of all particles."""
+    global current_state
+    # Fixing random state for reproducibility
+    random.seed("not really random")
+    initial_state = np.zeros((2, n))
+    for i in range(n):
+        initial_state[0][i] = random.uniform(-2 * np.pi, 2 * np.pi)
+        initial_state[1][i] = max(min(random.gauss(0, stdev), 5), -5)
+    current_state = initial_state
+    return initial_state
+
+
 ###############################################################################
 # Time step
 ###############################################################################
-@jit(nopython=True)  # numba makes it fast!
+@jit(nopython=True, cache=True)  # numba makes it fast!
 def time_step(state, frame, dt, history, ke):
     """Evolve state forward in time by dt with periodic boundary conditions."""
     for i in np.arange(n):
@@ -81,7 +90,7 @@ def time_step(state, frame, dt, history, ke):
             state[0][i] += 4 * np.pi
         history[frame][0][i] = state[0][i]
         history[frame][1][i] = state[1][i]
-    ke[frame] = 0.5*(np.square(state[1][i]))
+    ke[frame] = 0.5 * (np.square(state[1][i]))
     frame += 1
     return state
 
@@ -110,31 +119,51 @@ def update(frame):
 ###############################################################################
 # Main script
 ###############################################################################
-"""Do the things."""
 if plot_initial_distributions:
+    initial_state = initialize_state()
     print(f"Initial state: \n{initial_state}")
+    bin_width = 0.25
 
-    plt.figure()
-    plt.subplot(2, 2, 1)
-    plt.subplots_adjust(hspace=0.4)
+    fig1 = plt.figure()
+    plt.subplots_adjust(hspace=0.7)
+    fig1.suptitle(f"Initial distribution (n={n})")
 
-    bins = math.ceil((x_range[1] - x_range[0]) / 0.25)
-    plt.hist(initial_state[0], bins=bins, range=x_range)
-    plt.title("Initial position distribution")
-    plt.subplot(2, 2, 2)
-    bins = math.ceil((v_range[1] - v_range[0]) / 0.25)
-    plt.hist(initial_state[1], bins=bins, range=v_range)
-    plt.title("Initial velocity distribution")
-    plt.subplot(2, 2, (3, 4))
-    plt.title("Phase space distribution")
-    plt.plot(current_state[0], current_state[1], "k.", markersize=1)
+    # Plot initial position histogram
+    ax_init_position = fig1.add_subplot(2, 2, 1)
+    bins = math.ceil((x_range[1] - x_range[0]) / bin_width)
+    ax_init_position.hist(initial_state[0], bins=bins, range=x_range)
+    ax_init_position.set_xlabel("x")
+    ax_init_position.set_ylabel("count")
+    plt.title("Position")
+
+    # Plot initial velocity histogram
+    ax_init_velocity = fig1.add_subplot(2, 2, 2)
+    bins = math.ceil((v_range[1] - v_range[0]) / bin_width)
+    ax_init_velocity.hist(initial_state[1], bins=bins, range=v_range)
+    ax_init_velocity.set_xlabel("v")
+    plt.title("Velocity")
+
+    # Plot initial positions in phase space
+    ax_init_phase = fig1.add_subplot(2, 2, (3, 4))
+    plt.title("Initial phase space")
+    plt.plot(current_state[0], current_state[1], "ko", markersize=1)
+    create_folder(os.path.join(os.getcwd(), "plots", "proj1"))
     fig_name = os.path.join("plots", "proj1", f"initial_hist_{n}_particles.pdf")
     plt.savefig(fig_name)
     print(f"Saved figure {os.path.join(os.getcwd(), fig_name)} to disk.")
     plt.show()
+
 if animate_phase_space:
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig2, ax = plt.subplots(figsize=(12, 10))
     (pt,) = plt.plot([], [], "r.", markersize=0.3)
+
+    # Add a label to the frame showing the current time. Updated each time step
+    # in update()
     time_text = ax.text(0.02, 0.95, "", transform=ax.transAxes)
-    animation = FuncAnimation(fig, update, frames=t_steps, init_func=init, blit=True, interval=1)
+
+    # Evolve positions until t_max. Animate particle positions in phase space.
+    animation = FuncAnimation(fig2, update, frames=t_steps, init_func=init, blit=True, interval=1)
     plt.show()
+
+if trace_particles:
+    initialize_state()
