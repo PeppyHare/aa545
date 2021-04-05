@@ -20,9 +20,9 @@ from numba import jit
 # Settings
 ###############################################################################
 
-plot_initial_distributions = True
-animate_phase_space = True  # Mutually exclusive with generating timeseries plots
-trace_particles = False
+plot_initial_distributions = 1
+animate_phase_space = 0  # Mutually exclusive with generating timeseries plots
+trace_particles = 0
 
 
 # Number of particles
@@ -41,6 +41,10 @@ v_min = -5.0
 v_max = 5.0
 v_range = (v_min, v_max)
 stdev = fwhm / 2.355
+
+
+# Fixing random state for reproducibility
+random.seed("not really random")
 initial_state = np.zeros((2, n))
 for i in range(n):
     initial_state[0][i] = random.uniform(-2 * np.pi, 2 * np.pi)
@@ -109,9 +113,11 @@ def update(frame):
 """Do the things."""
 if plot_initial_distributions:
     print(f"Initial state: \n{initial_state}")
+
     plt.figure()
     plt.subplot(2, 2, 1)
     plt.subplots_adjust(hspace=0.4)
+
     bins = math.ceil((x_range[1] - x_range[0]) / 0.25)
     plt.hist(initial_state[0], bins=bins, range=x_range)
     plt.title("Initial position distribution")
