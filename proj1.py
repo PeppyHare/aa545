@@ -18,19 +18,21 @@ from numba import jit
 
 from utils import create_folder
 
+import debugpy
+debugpy.debug_this_thread()
 ###############################################################################
 # Settings
 ###############################################################################
 
 plot_initial_distributions = 0
 animate_phase_space = 0  # Mutually exclusive with generating timeseries plots
-plot_snapshots = 0
-trace_particles = 1
+plot_snapshots = 1
+trace_particles = 0
 
 
 # Number of particles
-n = 128
-# n = 512
+# n = 128
+n = 512
 # n = 2048
 
 # Initial position distribution: uniform over [-2π, 2π]
@@ -159,11 +161,11 @@ if plot_initial_distributions:
     ax_init_phase = fig1.add_subplot(2, 2, (3, 4))
     plt.title("Initial phase space")
     plt.plot(current_state[0], current_state[1], "ko", markersize=1)
+    plt.tight_layout()
     create_folder(os.path.join(os.getcwd(), "plots", "proj1"))
     fig_name = os.path.join("plots", "proj1", f"initial_hist_{n}_particles.pdf")
     plt.savefig(fig_name)
     print(f"Saved figure {os.path.join(os.getcwd(), fig_name)} to disk.")
-    plt.tight_layout()
     plt.show()  # Wait for user to close the plot
 
 if animate_phase_space:
@@ -185,27 +187,36 @@ if plot_snapshots:
         time_step(current_state, frame=frame, dt=dt, history=history, ke=ke)
     print("done!")
 
+    # Plot phase space snapshots
     fig3 = plt.figure()
     fig3.suptitle(f"Time Snapshots (n={n})")
     ax_t0 = fig3.add_subplot(3, 1, 1)
     ax_t0.set_ylabel("v")
-    plt.plot(history[0][0], history[0][1], "ko", markersize=1)
+    plt.plot(history[0,...,0], history[0,...,1], "ko", markersize=1)
 
     ax_t1 = fig3.add_subplot(3, 1, 2)
     ax_t1.set_ylabel("v")
     t1 = 2.0 * np.pi
     frame_t1 = int(t1 / dt)
-    plt.plot(history[frame_t1][0], history[frame_t1][1], "ko", markersize=1)
+    plt.plot(history[0,...,frame_t1], history[1,...,frame_t1], "ko", markersize=1)
 
     ax_t2 = fig3.add_subplot(3, 1, 3)
     ax_t2.set_ylabel("v")
     ax_t0.set_xlabel("x")
     t2 = 8.0 * np.pi
     frame_t2 = int(t2 / dt)
-    plt.plot(history[frame_t2][0], history[frame_t2][1], "ko", markersize=1)
+    plt.plot(history[0,...,frame_t2], history[1,...,frame_t2], "ko", markersize=1)
     plt.tight_layout()
 
-    plt.show()  # Wait for user to close the plot
+    # Plot kinetic energy
+    fig3_1 = plt.figure()
+    fig3_1.suptitle(f"Total Kinetic Energy (n={n})")
+    ax_ke = fig3_1.add_subplot(1, 1, 1)
+    plt.plot(np.linspace(0, t_max, t_steps), np.sum(ke, axis=0))
+    ax_ke.set_ylabel("Total KE")
+    ax_ke.set_xlabel("Time")
+
+    plt.show()  # Wait for user to close the plots
 
 if trace_particles:
     t_max = 2 * np.pi
@@ -224,7 +235,18 @@ if trace_particles:
         velocity = history[1][i]
         ax4.plot(position, velocity, "o", markersize=1)
         ax4.set_xlabel("x")
-        ax4.set_ylabel("y")
-    plt.show()
+        ax4.set_ylabel("v")
+    create_folder(os.path.join(os.getcwd(), "plots", "proj1"))
+    fig_name = os.path.join("plots", "proj1", f"traces_{n}_particles.pdf")
+    plt.savefig(fig_name)
+    print(f"Saved figure {os.path.join(os.getcwd(), fig_name)} to disk.")
 
-if plot_
+    # Plot total kinetic energy over time
+    fig4_1 = plt.figure()
+    fig4_1.suptitle(f"Total Kinetic Energy (n={n})")
+    ax_ke = fig4_1.add_subplot(1, 1, 1)
+    plt.plot(np.linspace(0, t_max, t_steps), np.sum(ke, axis=0))
+    ax_ke.set_ylabel("Total KE")
+    ax_ke.set_xlabel("Time")
+
+    plt.show()
