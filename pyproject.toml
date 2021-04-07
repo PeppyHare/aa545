@@ -1,17 +1,15 @@
 [tool.poetry]
-name = "proj1"
+name = "pic1"
 version = "0.1.0"
-description = "Coding project 1"
+description = "Coding project 1.1: One-dimensional force-free PIC modeling."
 authors = ["Evan Bluhm <embluhm@uw.edu>"]
-
-[tool.poetry.scripts]
-proj1 = "proj1:__main__"
 
 [tool.poetry.dependencies]
 python = "^3.6,<3.10"
 matplotlib = "^3.4.1"
 numpy = "^1.20.2"
 numba = "^0.53.1"
+progressbar = "^2.5"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.2.1"
