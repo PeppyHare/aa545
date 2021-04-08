@@ -23,20 +23,26 @@ There are several flags and parameters that can be modified to control the behav
 
 ## Running the Script
 
-Running the `pic1.py` script requires a Python install (>=3.6) with either `pip` or `poetry` for depdency installation.
+Running the `pic1.py` script requires a Python install (NumPy 1.20.2 supports either Python 3.7 or Python 3.8) with either `pip` or `poetry` for depdency installation.
 
 ### Using Poetry
 
 With [poetry](https://python-poetry.org/) installed, dependencies can be automatically installed into a virtual environment by running the following in a command prompt:
 
 ```
+poetry update
 poetry run ./pic1.py
+```
+
+Note that Poetry will only successfully install LLVMlite if the installed system Python version is in the range 3.7-3.8. To make use of a Python installation besides the system python, first run:
+
+```
+poetry env use </path/to/python/executable>
 ```
 
 ### Using Pip
 
 With [pip](https://pypi.org/project/pip/) installed, dependencies can be installed in a local virtual environment by executing the following commands:
-
 
 **MacOS and Linux**:
 
