@@ -21,15 +21,16 @@ trajectories for the N = 128 case up to t = 2π. Compare plots of the kinetic
 energy history for all four cases for different time step values. Upload your
 report in pdf format, source code, and run script/instructions.
 """
-import random
 import math
 import os
 from pathlib import Path
+import random
+import time
 
-import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
-from numba import jit
+import numba
+import numpy as np
 import progressbar
 
 
@@ -55,6 +56,10 @@ trace_particles = True
 # the total kinetic energy diagnostic over time
 compare_ke = True
 
+# Run the simulation with many particles and a small time step to evaluate the
+# elapsed per-step computation time
+performance_testing = True
+
 # Number of particles
 n = 128
 # n = 512
@@ -69,7 +74,7 @@ v_min = -5.0
 v_max = 5.0
 
 # Time step and duration
-dt = 0.01
+dt = 0.05
 t_max = 8 * np.pi
 
 
@@ -117,18 +122,29 @@ def initialize_state():
 ###############################################################################
 # Time step
 ###############################################################################
-@jit(nopython=True, cache=True)  # numba makes it fast!
+@numba.jit(nopython=True, parallel=(n > 10 ** 3))
 def time_step(state, frame, dt, history, ke):
-    """Evolve state forward in time by dt with periodic boundary conditions."""
-    for i in np.arange(n):
+    """Evolve state forward in time by dt with periodic boundary conditions.
+
+    Governing equations are:
+        x[i](t + ∆t) = x[i](t) + v[i](t) * ∆t
+        v[i](t + ∆t) = v[i](t)
+
+    The @numba.jit decorator translates the time_step function to optimized
+    machine code using a packaged LLVM compiler. Depending on the size of n and
+    t_steps, the performance improvement is up to 100x the speed of the pure
+    Python.
+    """
+    global x_max, x_min
+    for i in numba.prange(n):
         # No collisions or forces, just dx=v*dt
         state[0][i] += state[1][i] * dt
 
         # Apply boundary conditions
-        if state[0][i] > 2 * np.pi:
-            state[0][i] -= 4 * np.pi
-        if state[0][i] < -2 * np.pi:
-            state[0][i] += 4 * np.pi
+        if state[0][i] > x_max:
+            state[0][i] -= x_max - x_min
+        if state[0][i] < x_min:
+            state[0][i] += x_max - x_min
 
         history[0][i][frame] += state[0][i]
         history[1][i][frame] += state[1][i]
@@ -157,9 +173,9 @@ def run():
 ###############################################################################
 # Animation code
 ###############################################################################
-def init():
+def init_animation():
     """Animation initialization."""
-    global ax, x_range, v_min, v_max
+    global ax, pt, x_range, v_min, v_max
     ax.set_xlim(x_range)
     ax.set_ylim(v_min, v_max)
     return (pt,)
@@ -228,8 +244,11 @@ if plot_initial_distributions:
 
 if animate_phase_space:
     print("Generating animation of phase space over time.")
+    initial_state = initialize_state()
     fig2, ax = plt.subplots(figsize=(12, 10))
     (pt,) = plt.plot([], [], "k.", markersize=1)
+    ax.set_ylabel("v")
+    ax.set_xlabel("x")
 
     # Add a label to the frame showing the current time. Updated each time step
     # in update()
@@ -237,13 +256,20 @@ if animate_phase_space:
 
     # Evolve positions until t_max. Animate particle positions in phase space.
     animation = FuncAnimation(
-        fig2, update, frames=t_steps, init_func=init, blit=True, interval=1
+        fig2,
+        update,
+        frames=t_steps,
+        init_func=init_animation,
+        blit=True,
+        interval=1,
     )
     plt.show()  # Waits for user to close the plot
 
 if plot_snapshots:
     print("Generating snapshots of state at various time intervals.")
-    initialize_state()
+    t_max = 8 * np.pi
+    t_steps = t_steps = math.ceil(t_max / dt)
+    initial_state = initialize_state()
     run()
 
     # Plot phase space snapshots
@@ -251,10 +277,12 @@ if plot_snapshots:
     fig3.suptitle(f"Time Snapshots (n={n})")
     ax_t0 = fig3.add_subplot(3, 1, 1)
     ax_t0.set_ylabel("v")
+    ax_t0.set_title(r"$t=0$")
     plt.plot(history[0, ..., 0], history[1, ..., 0], "ko", markersize=1)
 
     ax_t1 = fig3.add_subplot(3, 1, 2)
     ax_t1.set_ylabel("v")
+    ax_t1.set_title(r"$t=2\pi$")
     t1 = 2.0 * np.pi
     frame_t1 = int(t1 / dt)
     plt.plot(
@@ -263,7 +291,8 @@ if plot_snapshots:
 
     ax_t2 = fig3.add_subplot(3, 1, 3)
     ax_t2.set_ylabel("v")
-    ax_t0.set_xlabel("x")
+    ax_t2.set_xlabel("x")
+    ax_t2.set_title(r"$t=8\pi$")
     t2 = 8.0 * np.pi
     frame_t2 = int(t2 / dt)
     plt.plot(
@@ -272,14 +301,6 @@ if plot_snapshots:
     plt.tight_layout()
     save_plot(f"snapshots_{n}_particles.pdf")
 
-    # Plot kinetic energy
-    fig3_1 = plt.figure()
-    fig3_1.suptitle(f"Total Kinetic Energy (n={n})")
-    ax_ke = fig3_1.add_subplot(1, 1, 1)
-    plt.plot(np.linspace(0, t_max, t_steps), ke)
-    ax_ke.set_ylabel("Total KE")
-    ax_ke.set_xlabel("Time")
-
     plt.show()  # Waits for user to close the plots
 
 if trace_particles:
@@ -287,11 +308,7 @@ if trace_particles:
     t_max = 2 * np.pi
     t_steps = t_steps = math.ceil(t_max / dt)
     initialize_state()
-    print("Simulating...")
-    for frame in range(t_steps):
-        time_step(current_state, frame=frame, dt=dt, history=history, ke=ke)
-    print("done!")
-    # try just plotting the first particle's trajectory
+    run()
     fig4 = plt.figure()
     fig4.suptitle(f"Particle trajectories (n={n})")
     ax4 = fig4.add_subplot(1, 1, 1)
@@ -318,23 +335,58 @@ if trace_particles:
 
 if compare_ke:
     print(
-        "Generating comparison plots of change in kinetic energy over time for various time steps."
+        "Generating comparison plots of change in kinetic energy over time for"
+        " various time steps."
     )
     # Compare the total kinetic energy over time for various time steps
     t_max = 8 * np.pi
     dt_trials = [0.1, 0.01, 0.001, 0.0001]
     fig5 = plt.figure()
-    fig5.suptitle(f"Change in Total Kinetic Energy (n={n})")
-    ax_ke = fig5.add_subplot(1, 1, 1)
+    fig5.suptitle(f"Change in Total Kinetic Energy over Time")
+    ax_ke = fig5.add_subplot(1, 3, (1, 2))
     ax_ke.set_ylabel(r"$KE(t)-KE(0)$")
-    for dt in dt_trials:
-        t_steps = t_steps = math.ceil(t_max / dt)
-        initial_state = initialize_state()
-        initial_ke = 0.5 * (np.sum(np.square(initial_state[1])))
-        run()
-        plt.plot(
-            np.linspace(0, t_max, t_steps), (ke - initial_ke), label=f"dt={dt}"
-        )
-    ax_ke.legend()
-    save_plot(f"d_ke_{n}_particles.pdf")
+    ax_ke.set_xlabel(r"$t$")
+    float_eps = np.finfo(float).eps
+    y_max = float_eps
+    y_min = -float_eps
+    for n in [128, 512, 2048]:
+        for dt in dt_trials:
+            t_steps = t_steps = math.ceil(t_max / dt)
+            initial_state = initialize_state()
+            run()
+            initial_ke = ke[0]
+            if y_max < np.amax(ke - initial_ke):
+                y_max = np.amax(ke - initial_ke)
+            if y_min > np.amin(ke - initial_ke):
+                y_min = np.amin(ke - initial_ke)
+            plt.plot(
+                np.linspace(0, t_max, t_steps),
+                (ke - initial_ke),
+                label=f"n={n}, dt={dt}",
+            )
+    plt.ylim(y_min, y_max)
+    plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left", ncol=1)
+    save_plot(f"d_ke_comparison.pdf")
     plt.show()  # Waits for user to close the plots
+
+
+if performance_testing:
+    # Performance testing: print execution time per time_step(), excluding JIT
+    # compilation time
+    n = 40980
+    dt = 0.005
+    initial_state = initialize_state()
+    # Run one short iteration to compile time_step()
+    t_steps = 1
+    run()
+    # Then we can run the full simulation without counting compile time
+    t_max = 8 * np.pi
+    t_steps = math.ceil(t_max / dt)
+    initial_state = initialize_state()
+    start_time = time.perf_counter()
+    run()
+    end_time = time.perf_counter()
+    print(
+        f"Total elapsed time per step (n={n}):"
+        f" {1000.0*(end_time - start_time)/t_steps:.5f} ms"
+    )

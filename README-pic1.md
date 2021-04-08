@@ -27,7 +27,7 @@ Running the `pic1.py` script requires a Python install (>=3.6) with either `pip`
 
 ### Using Poetry
 
-With [poetry](https://python-poetry.org/) installed, dependencies can be automatically installed into a virtual environment by running:
+With [poetry](https://python-poetry.org/) installed, dependencies can be automatically installed into a virtual environment by running the following in a command prompt:
 
 ```
 poetry run ./pic1.py
