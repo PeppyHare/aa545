@@ -33,7 +33,8 @@ import numba
 import numpy as np
 import progressbar
 
-from weighting import weight_nearest, weight_linear
+from weighting import weight_particles, weight_field
+from poisson import setup_poisson, solve_poisson
 
 
 ###############################################################################
@@ -56,12 +57,12 @@ from weighting import weight_nearest, weight_linear
 # "performance_testing": Run the simulation with many particles and a small time
 # step to evaluate the elapsed per-step computation time
 step_flags = [
-    "plot_initial_distributions",
+    # "plot_initial_distributions",
     "animate_phase_space",
-    "plot_snapshots",
-    "trace_particles",
-    "compare_ke",
-    "performance_testing",
+    # "plot_snapshots",
+    # "trace_particles",
+    # "compare_ke",
+    # "performance_testing",
 ]
 
 
@@ -70,23 +71,26 @@ n = 128
 # n = 512
 # n = 2048
 
-# Number of grid cells
-m = 32
+# Number of grid points
+m = 33
 
 # Initial position distribution: uniform over [-2π, 2π]
 x_min = -2 * np.pi
 x_max = 2 * np.pi
 # Initial velocity distribution: Maxwellian with FWHM=2
-v_fwhm = 2.0
-v_min = -5.0
-v_max = 5.0
+v_fwhm = 2
+v_min = -5
+v_max = 5
 
 # Time step and duration
 dt = 0.05
-t_max = 8 * np.pi
+t_max = 80 * np.pi
 
-weighting_func = weight_nearest  # Nearest grid point
+# Weighting order. 0 = nearest grid point. 1 = linear weighting
+weighting_order = 1
 
+# Charge-to-mass ratio of species
+qm = 0.1
 
 ###############################################################################
 # Initialization
@@ -105,21 +109,27 @@ t_steps = math.ceil(t_max / dt)
 frame = 0  # the current time step
 
 # Grid spacing / particle size
-a = 1.0 / m
+dx = 1 / (m - 1)
 
 # Initialize arrays
-# state[0, i] = x'[i]
-# state[1, i] = v'[i]
 x = np.zeros(n)
 v = np.zeros(n)
-# current_state = np.zeros((2, n))
+e_j = np.zeros(m)
 
 # Store the history of all particles
 x_history = np.zeros((n, t_steps))
 v_history = np.zeros((n, t_steps))
 
+grid_pts = np.linspace(0, 1, m)
+
 # Calculate the kinetic energy at each timestep
 ke = np.zeros(t_steps)
+
+# Finite difference matrix used to solve Poisson equation
+inv_a = setup_poisson(m)
+
+# Background charge density
+rho_bg = -n / ((m - 1) * dx)
 
 
 def initialize_state():
@@ -137,6 +147,13 @@ def initialize_state():
     x = initial_x
     v = initial_v
 
+    # Project velocity backwards 1/2 time step
+    rho = weight_particles(x, grid_pts, dx, m, order=weighting_order) + rho_bg
+    # Solve for field at t=0
+    e_j = solve_poisson(rho, inv_a, dx)
+    e_i = weight_field(x, grid_pts, e_j, dx, order=weighting_order)
+    v += (-dt / 2) * qm / x_scale * e_i
+
     # (Re-)initialize state history
     x_history = np.zeros((n, t_steps))
     v_history = np.zeros((n, t_steps))
@@ -153,28 +170,36 @@ def initialize_state():
 ###############################################################################
 # Time step
 ###############################################################################
-@numba.jit(nopython=True, cache=False)
-def time_step(x, v, frame, dt, ke, x_history, v_history):
-    """Evolve state forward in time by dt with periodic boundary conditions.
+@numba.njit
+def particle_push(x, v, frame, dt, e_i, ke, x_history, v_history):
+    """Evolve state forward in time by ∆t with periodic boundary conditions.
 
-    Governing equations are:
-        x[i](t + ∆t) = x[i](t) + v[i](t) * ∆t
-        v[i](t + ∆t) = v[i](t)
+    Governing equations are: x[i](t + ∆t) = x[i](t) + v[i](t + ∆t/2) * ∆t v[i](t
+        + ∆t) = v[i](t) + e[i](t + ∆t/2) * (q/m) * ∆t
 
-    The @numba.jit decorator translates the time_step function to optimized
-    machine code using a packaged LLVM compiler. Depending on the size of n and
-    t_steps, the performance improvement is up to 100x the speed of the pure
-    Python.
+    The @numba.jit decorator compiles the particle_push function to optimized
+    machine code using the `llvmlite` version of the LLVM compiler. Depending on
+    the size of n and t_steps, the performance improvement is up to 100x the
+    speed of the pure Python (still awful compared to C, but good enough for
+    educational purposes).
     """
+    # numba.prange is like np.arange, but optimized for parallelization across
+    # multiple CPU cores
     for i in numba.prange(x.size):
-        # No collisions or forces, just dx=v*dt
-        x[i] += v[i] * dt
+        # x[i] and v[i] are offset in time by ∆t/2, so that they leap-frog past
+        # each other:
+        #
+        #          x(old)       x(new)
+        # -----------*------------*----->
+        #   v(old)       v(new)
+        # ----*------------*------------> t
+        #     |      |     |      |
+        #   -∆t/2    0   ∆t/2    ∆t
 
-        # Apply boundary conditions NumPy uses the definition of floor where
-        # floor(-2.5) == -3. Interestingly, wrapping this in the following if
-        # clause does not affect the computation time; the resulting arithmetic
-        # is identical:
-        # if state[0][i] > 1.0 or state[0][i] < 0.0:
+        x[i] += v[i] * dt
+        v[i] += e_i[i] * dt * qm / x_scale
+        # Apply periodic boundary conditions. NumPy uses the definition of floor
+        # where floor(-2.5) == -3.
         x[i] -= np.floor(x[i])
         x_history[i][frame] += x[i]
         v_history[i][frame] += v[i]
@@ -186,7 +211,7 @@ def time_step(x, v, frame, dt, ke, x_history, v_history):
 
 def run(nonumba=False):
     """Run the simulation."""
-    global x, v, t_steps, dt, ke, x_history, v_history
+    global x, v, t_steps, dt, m, dx, grid_pts, ke, x_history, v_history
     print("Simulating...")
     bar = progressbar.ProgressBar(
         maxval=t_steps,
@@ -194,22 +219,40 @@ def run(nonumba=False):
     )
     bar.start()
     for frame in range(t_steps):
-        if nonumba:
-            time_step.py_func(
+        if not nonumba:
+            rho = (
+                weight_particles(x, grid_pts, dx, m, order=weighting_order)
+                + rho_bg
+            )
+            e_j = solve_poisson(rho, inv_a, dx)
+            e_i = weight_field(x, grid_pts, e_j, dx, order=weighting_order)
+            particle_push(
                 x,
                 v,
                 frame=frame,
                 dt=dt,
+                e_i=e_i,
                 ke=ke,
                 x_history=x_history,
                 v_history=v_history,
             )
         else:
-            time_step(
+            rho = (
+                weight_particles.py_func(
+                    x, grid_pts, dx, m, order=weighting_order
+                )
+                + rho_bg
+            )
+            e_j = solve_poisson.py_func(rho, inv_a, dx)
+            e_i = weight_field.py_func(
+                x, grid_pts, e_j, dx, order=weighting_order
+            )
+            particle_push.py_func(
                 x,
                 v,
                 frame=frame,
                 dt=dt,
+                e_i=e_i,
                 ke=ke,
                 x_history=x_history,
                 v_history=v_history,
@@ -232,12 +275,18 @@ def init_animation():
 
 def update(frame):
     """Call every time we update animation frame."""
-    global x, v, dt, time_text, pt
-    time_step(
+    global x, v, dt, ke, time_text, pt
+    if frame == 0:
+        x, v, ke = initialize_state()
+    rho = weight_particles(x, grid_pts, dx, m, order=weighting_order) + rho_bg
+    e_j = solve_poisson(rho, inv_a, dx)
+    e_i = weight_field(x, grid_pts, e_j, dx, order=weighting_order)
+    particle_push(
         x,
         v,
         frame=frame,
         dt=dt,
+        e_i=e_i,
         ke=ke,
         x_history=x_history,
         v_history=v_history,
@@ -269,17 +318,40 @@ def save_plot(filename):
 if "plot_initial_distributions" in step_flags:
     print("Generating plots of initial particle state.")
     x, v, ke = initialize_state()
-    bin_width = 0.25
+    bin_width = 0.1
 
     fig1 = plt.figure()
     fig1.suptitle(f"Initial distribution (n={n})")
 
     # Plot initial position histogram
+    rho_weight_ngp = weight_particles(x, grid_pts, dx, m, order=0)
+    print(f"Total charge (ngp): {np.sum(rho_weight_ngp[:-1] * dx)}")
+    rho_weight_lin = weight_particles(x, grid_pts, dx, m, order=1)
+    print(f"Total charge (linear): {np.sum(rho_weight_lin[:-1] * dx)}")
     ax_init_position = fig1.add_subplot(2, 2, 1)
     bins = math.ceil((x_range[1] - x_range[0]) / bin_width)
+    ax_weighted = ax_init_position.twinx()
     ax_init_position.hist((x * x_scale) + x_min, bins=bins, range=x_range)
+    ax_weighted.step(
+        (grid_pts * x_scale) + x_min,
+        rho_weight_ngp,
+        color="r",
+        marker="o",
+        where="mid",
+        linewidth=0.5,
+    )
+    ax_weighted.plot(
+        (grid_pts * x_scale) + x_min,
+        rho_weight_lin,
+        color="g",
+        marker="o",
+        linestyle="--",
+        linewidth=0.5,
+    )
+    ax_weighted.set_ylim(bottom=0)
     ax_init_position.set_xlabel(r"$x$")
     ax_init_position.set_ylabel("Count")
+    plt.xlim(x_range)
     plt.title("Position")
 
     # Plot initial velocity histogram
@@ -287,14 +359,30 @@ if "plot_initial_distributions" in step_flags:
     bins = math.ceil((v_range[1] - v_range[0]) / bin_width)
     ax_init_velocity.hist(v * x_scale, bins=bins, range=v_range)
     ax_init_velocity.set_xlabel(r"$v$")
+    plt.xlim(x_range)
     plt.title("Velocity")
 
     # Plot initial positions in phase space
     ax_init_phase = fig1.add_subplot(2, 2, (3, 4))
     plt.title("Initial phase space")
     plt.plot((x * x_scale) + x_min, (v * x_scale), "ko", markersize=1)
+    plt.xlim(x_range)
     ax_init_phase.set_xlabel(r"$x$")
     ax_init_phase.set_ylabel(r"$v$")
+    # Plot grid points
+    for grid_pt in grid_pts:
+        ax_init_phase.axvline(
+            (grid_pt * x_scale) + x_min,
+            linestyle="--",
+            color="k",
+            linewidth=0.2,
+        )
+        ax_init_position.axvline(
+            (grid_pt * x_scale) + x_min,
+            linestyle="--",
+            color="k",
+            linewidth=0.2,
+        )
     plt.tight_layout()
     save_plot(f"initial_hist_{n}_particles.pdf")
     plt.show()  # Waits for user to close the plot
@@ -302,8 +390,9 @@ if "plot_initial_distributions" in step_flags:
 if "animate_phase_space" in step_flags:
     print("Generating animation of phase space over time.")
     x, v, ke = initialize_state()
-    # fig2, ax = plt.subplots(figsize=(12, 10))
-    fig2, ax = plt.subplots()
+    fig2 = plt.figure()
+
+    # fig2, ax = plt.subplots(2, 2, figsize=(12, 10))
     (pt,) = plt.plot([], [], "k.", markersize=1)
     ax.set_ylabel("v")
     ax.set_xlabel("x")
@@ -320,13 +409,14 @@ if "animate_phase_space" in step_flags:
         frames=t_steps,
         init_func=init_animation,
         blit=True,
-        interval=1,
+        interval=10,
+        repeat=True,
     )
     plt.show()  # Waits for user to close the plot
 
 if "plot_snapshots" in step_flags:
     print("Generating snapshots of state at various time intervals.")
-    snapshot_times = [0.0, 2 * np.pi, 8 * np.pi]
+    snapshot_times = [0, 2 * np.pi, 8 * np.pi]
     t_max = 8 * np.pi
     t_steps = t_steps = math.ceil(t_max / dt)
     x, v, ke = initialize_state()
@@ -340,11 +430,17 @@ if "plot_snapshots" in step_flags:
     )
     bar.start()
     for frame in range(t_steps):
-        time_step(
+        rho = (
+            weight_particles(x, grid_pts, dx, m, order=weighting_order) + rho_bg
+        )
+        e_j = solve_poisson(rho, inv_a, dx)
+        e_i = weight_field(x, grid_pts, e_j, dx, order=weighting_order)
+        particle_push(
             x,
             v,
             frame=frame,
             dt=dt,
+            e_i=e_i,
             ke=ke,
             x_history=x_history,
             v_history=v_history,
@@ -453,34 +549,142 @@ if "compare_ke" in step_flags:
 
 
 if "performance_testing" in step_flags:
-    # Performance testing: print execution time per time_step(), excluding JIT
+    # Performance testing: print execution time per particle_push(), excluding JIT
     # compilation time
+
+    print("#" * 80 + "\nTesting performance of run():\n" + "#" * 80)
     n = 4098
-    dt = 0.01
+    dt = 0.05
     x, v, ke = initialize_state()
-    # Run one short iteration to compile time_step()
+
+    # Run one short iteration to compile particle_push()
     t_steps = 1
+    x_history = np.zeros((n, t_steps))
+    v_history = np.zeros((n, t_steps))
     run()
+
     # Then we can run the full simulation without counting compile time
     t_max = 8 * np.pi
     t_steps = math.ceil(t_max / dt)
     x, v, ke = initialize_state()
+
     start_time = time.perf_counter()
     run()
     end_time = time.perf_counter()
+
+    x, v, ke = initialize_state()
+    x_history = np.zeros((n, t_steps))
+    v_history = np.zeros((n, t_steps))
     start_time_slow = time.perf_counter()
     run(nonumba=True)
     end_time_slow = time.perf_counter()
+
     print(
         f"(numba ) Total elapsed time per step (n={n}):"
-        f" {1000.0*(end_time - start_time)/t_steps:.3f} ms"
+        f" {10**6 * (end_time - start_time) / t_steps:.3f} µs"
     )
     print(
         f"(python) Total elapsed time per step (n={n}):"
-        f" {1000.0*(end_time_slow - start_time_slow)/t_steps:.3f} ms"
+        f" {10**6 * (end_time_slow - start_time_slow) / t_steps:.3f} µs"
     )
     print(
         "numba speedup:"
-        f" {(end_time_slow - start_time_slow)/(end_time - start_time):.2f}"
+        f" {(end_time_slow - start_time_slow) / (end_time - start_time):.2f}"
         " times faster"
     )
+
+    print("\n" + "#" * 80)
+    print("Testing performance of weight_particles(order=0):\n" + "#" * 80)
+    m = 32
+    grid_pts = np.linspace(0, 1, m)
+    dx = 1 / (m - 1)
+    # Run one short iteration to compile particle_push()
+    weight_particles(x, grid_pts, dx, m, order=0)
+
+    ptime_numba = 0
+    bar = progressbar.ProgressBar(
+        maxval=t_steps,
+        widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+    )
+    bar.start()
+    for step in range(t_steps):
+        x = np.random.uniform(0.0, 1.0, n)
+        start_time = time.perf_counter()
+        weight_particles(x, grid_pts, dx, m, order=0)
+        end_time = time.perf_counter()
+        ptime_numba += end_time - start_time
+        bar.update(step + 1)
+    bar.finish()
+
+    ptime_python = 0
+    bar = progressbar.ProgressBar(
+        maxval=t_steps,
+        widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+    )
+    bar.start()
+    for step in range(t_steps):
+        x = np.random.uniform(0.0, 1.0, n)
+        start_time = time.perf_counter()
+        weight_particles.py_func(x, grid_pts, dx, m, order=0)
+        end_time = time.perf_counter()
+        ptime_python += end_time - start_time
+        bar.update(step + 1)
+    bar.finish()
+
+    print(
+        f"(numba ) Total elapsed time per step (n={n}):"
+        f" {10**6 * ptime_numba / t_steps:.3f} µs"
+    )
+    print(
+        f"(python) Total elapsed time per step (n={n}):"
+        f" {10**6 * ptime_python / t_steps:.3f} µs"
+    )
+    print(f"numba speedup: {(ptime_python) / (ptime_numba):.2f} times faster")
+
+    print("\n" + "#" * 80)
+    print("Testing performance of weight_particles(order=1):\n" + "#" * 80)
+    m = 32
+    grid_pts = np.linspace(0, 1, m)
+    dx = 1 / (m - 1)
+    # Run one short iteration to compile particle_push()
+    weight_particles(x, grid_pts, dx, m, order=1)
+
+    ptime_numba = 0
+    bar = progressbar.ProgressBar(
+        maxval=t_steps,
+        widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+    )
+    bar.start()
+    for step in range(t_steps):
+        x = np.random.uniform(0.0, 1.0, n)
+        start_time = time.perf_counter()
+        weight_particles(x, grid_pts, dx, m, order=1)
+        end_time = time.perf_counter()
+        ptime_numba += end_time - start_time
+        bar.update(step + 1)
+    bar.finish()
+
+    ptime_python = 0
+    bar = progressbar.ProgressBar(
+        maxval=t_steps,
+        widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+    )
+    bar.start()
+    for step in range(t_steps):
+        x = np.random.uniform(0.0, 1.0, n)
+        start_time = time.perf_counter()
+        weight_particles.py_func(x, grid_pts, dx, m, order=1)
+        end_time = time.perf_counter()
+        ptime_python += end_time - start_time
+        bar.update(step + 1)
+    bar.finish()
+
+    print(
+        f"(numba ) Total elapsed time per step (n={n}):"
+        f" {10**6 * ptime_numba / t_steps:.3f} µs"
+    )
+    print(
+        f"(python) Total elapsed time per step (n={n}):"
+        f" {10**6 * ptime_python / t_steps:.3f} µs"
+    )
+    print(f"numba speedup: {(ptime_python) / (ptime_numba):.2f} times faster")
