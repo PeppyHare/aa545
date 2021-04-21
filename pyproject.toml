@@ -11,12 +11,14 @@ numpy = "^1.20.2"
 numba = "^0.53.1"
 progressbar = "^2.5"
 scipy = "^1.6.2"
-PyQt5 = "^5.15.4"
+Kivy = {extras = ["base"], version = "^2.0.0"}
+Kivy-examples = "^2.0.0"
 
 
 [tool.poetry.dev-dependencies]
 bandit = "^1.7.0"
 flake8 = "^3.9.1"
+pytest = "^6.2.3"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
