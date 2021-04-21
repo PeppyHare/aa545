@@ -5,7 +5,6 @@ Coding project 1: Electrostatic Particle in Cell.
 import math
 import os
 from pathlib import Path
-import random
 import time
 
 from matplotlib import pyplot as plt
@@ -16,15 +15,22 @@ import progressbar
 
 from weighting import weight_particles, weight_field
 from poisson import setup_poisson, compute_field
-from config import (
+
+# There are several pre-configured settings and initial conditions. Include them
+# like this:
+# from config_langmuir_displacement import (
+# from config_langmuir_moving import (
+from config_leapfrog_instability import (
+    # from config_default import (
     step_flags,
     N,
     M,
     x_min,
     x_max,
-    v_fwhm,
     v_min,
     v_max,
+    initial_x,
+    initial_v,
     eps0,
     qm,
     q,
@@ -35,8 +41,6 @@ from config import (
     repeat_animation,
     markersize,
     snapshot_times,
-    plot_energy,
-    plot_fields,
 )
 
 ###############################################################################
@@ -48,9 +52,6 @@ v_range = (v_min, v_max)
 # Scale position from [x_min, x_max] to [0, 1]
 # x' = (x - x_min)/(x_max - x_min)
 L = x_max - x_min
-
-# For normal distribution, FWHM = 2*Sqrt(2*ln(2))σ ~ 2.355σ
-v_stdev = v_fwhm / 2.355
 
 t_steps = math.ceil(t_max / dt)
 frame = 0  # the current time step
@@ -85,30 +86,22 @@ p_hist = np.zeros(t_steps)
 # Finite difference matrix used to solve Poisson equation
 (inv_a, _) = setup_poisson(M)
 
+# If false, disable live plots of energy
+plot_energy = True
 
-def initialize_state():
+# If false, disable live plots of electric field
+plot_fields = True
+
+
+def initialize(x0=initial_x, v0=initial_v):
     """Set initial positions of all particles."""
     global x_i, v_i, t_steps, L, N, M, q, m, qm
     global v_min, v_max, v_stdev
     global x_hist, v_hist, ke_hist, fe_hist, p_hist
     global inv_a, e_i, e_j
-    # Fixing random state for reproducibility
-    random.seed("not really random")
-    initial_x = np.zeros(N)
-    initial_v = np.zeros(N)
-    # initial_x[0] = 0.5 - 1 / 8
-    # initial_x[1] = 0.5 + 1 / 8
-    for i in range(N):
-        initial_x[i] = random.uniform(0, 1)
-        # initial_v[i] = max(min(random.gauss(0, v_stdev), v_max), v_min) / L
-        if i < N / 2:
-            # initial_v[i] = random.gauss(0, 0.01) + 0.2
-            initial_v[i] = 0.2
-        else:
-            # initial_v[i] = random.gauss(0, 0.01) - 0.2
-            initial_v[i] = -0.2
-    x_i = initial_x
-    v_i = initial_v
+
+    x_i = (x0 - x_min) / L
+    v_i = v0 / L
 
     # Project velocity backwards 1/2 time step
     rho = weight_particles(x_i, x_j, dx, M, q, order=weighting_order) + rho_bg
@@ -228,7 +221,7 @@ def run(nonumba=False):
         widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
     )
     bar.start()
-    initialize_state()
+    initialize()
     for frame in range(t_steps):
         if not nonumba:
             time_step(
@@ -256,7 +249,7 @@ def run(nonumba=False):
                 v_hist=v_hist,
                 nonumba=nonumba,
             )
-        bar.update(frame + 1)
+        bar.update(frame)
     bar.finish()
     print("done!")
 
@@ -266,20 +259,20 @@ def run(nonumba=False):
 ###############################################################################
 def init_animation():
     """Animation initialization."""
-    global ax_xv, pt_xv, x_range, v_min, v_max
+    global ax_xv, pt_xv1, pt_xv2, x_range, v_min, v_max
     ax_xv.set_xlim(x_range)
     ax_xv.set_ylim(v_min, v_max)
-    return (pt_xv,)
+    return (pt_xv1, pt_xv2)
 
 
 def animate(frame):
     """Call every time we update animation frame."""
     global x_i, v_i, dt, ke_hist, L, x_min, x_max
-    global pt_ke, pt_fe, pt_te, time_axis, pt_xv, time_text, ax_energy
+    global pt_ke, pt_fe, pt_te, time_axis, pt_xv1, pt_xv2, time_text, ax_energy
     global ke_hist, fe_hist, p_hist, x_hist, v_hist
     global x_j, e_j, pt_efield, e_max, plot_energy, plot_fields
     if frame == 0:
-        x_i, v_i, ke_hist = initialize_state()
+        x_i, v_i, ke_hist = initialize()
     x_i, v_i, e_j = time_step(
         frame,
         x_i=x_i,
@@ -294,7 +287,10 @@ def animate(frame):
     )
     current_time = frame * dt
     time_text.set_text(f"t = {current_time:.2f}")
-    pt_xv.set_data((x_i * L) + x_min, (v_i * L))
+    n2 = math.ceil(N / 2)
+    pt_xv1.set_data((x_i[:n2] * L) + x_min, (v_i[:n2] * L))
+    if n2 > 0:
+        pt_xv2.set_data((x_i[n2:] * L) + x_min, (v_i[n2:] * L))
     if plot_fields:
         pt_efield.set_data(
             (np.concatenate([x_j, np.array([x_max])]) * L) + x_min,
@@ -304,10 +300,10 @@ def animate(frame):
         pt_ke.set_data(time_axis, ke_hist)
         pt_fe.set_data(time_axis, fe_hist)
         pt_te.set_data(time_axis, fe_hist + ke_hist)
-        if fe_hist[frame] + ke_hist[frame] > e_max:
+        if fe_hist[frame] + ke_hist[frame] > 1.2 * e_max:
             e_max = fe_hist[frame] + ke_hist[frame]
             ax_energy.set_ylim(0, e_max * 1.4)
-    return pt_xv, time_text, pt_ke, pt_fe, pt_te, pt_efield
+    return pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te, pt_efield
 
 
 ###############################################################################
@@ -330,7 +326,7 @@ def save_plot(filename):
 ###############################################################################
 if "plot_initial_distributions" in step_flags:
     print("Generating plots of initial particle state.")
-    x_i, v_i, ke_hist = initialize_state()
+    x_i, v_i, ke_hist = initialize()
     bin_width = 0.1
 
     fig1 = plt.figure()
@@ -402,7 +398,7 @@ if "plot_initial_distributions" in step_flags:
 
 if "animate_phase_space" in step_flags:
     print("Generating animation of phase space over time.")
-    initialize_state()
+    initialize()
     bigfig = plt.figure(figsize=(12, 8))
     bigfig.suptitle(f"n={N}  m={M}  dt={dt:.4f} t_max={t_max:.4f}")
     ax_xv = plt.subplot2grid((2, 2), (0, 0), colspan=2, rowspan=1)
@@ -427,8 +423,24 @@ if "animate_phase_space" in step_flags:
     ax_efield.set_ylabel("Electric field")
     ax_efield.set_xlabel("x")
 
-    # fig2, ax = plt.subplots(2, 2, figsize=(12, 10))
-    (pt_xv,) = ax_xv.plot([], [], "k.", markersize=markersize, label="xv")
+    (pt_xv1,) = ax_xv.plot(
+        [],
+        [],
+        "k.",
+        color="tab:orange",
+        marker=".",
+        markersize=markersize,
+        label="xv",
+    )
+    (pt_xv2,) = ax_xv.plot(
+        [],
+        [],
+        "k.",
+        color="tab:cyan",
+        marker=".",
+        markersize=markersize,
+        label="xv",
+    )
     (pt_ke,) = ax_energy.plot([], [], "b-", markersize=1, label="ke")
     (pt_fe,) = ax_energy.plot([], [], "g-", markersize=1, label="fe")
     (pt_te,) = ax_energy.plot([], [], "k-", markersize=1, label="total")
@@ -437,6 +449,17 @@ if "animate_phase_space" in step_flags:
         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
     )
     (pt_efield,) = ax_efield.plot([], [], "c", label="efield")
+
+    # Add the grid points to the plot of the fields, but only if there aren't
+    # too many of them
+    if x_j.size < 80:
+        for grid_pt in x_j:
+            ax_efield.axvline(
+                (grid_pt * L) + x_min,
+                linestyle="--",
+                color="k",
+                linewidth=0.2,
+            )
 
     # Add a label to the frame showing the current time. Updated each time step
     # in update()
@@ -458,7 +481,7 @@ if "animate_phase_space" in step_flags:
 if "plot_snapshots" in step_flags:
     print("Generating snapshots of state at various time intervals.")
     t_steps = t_steps = math.ceil(t_max / dt)
-    x_i, v_i, ke_hist = initialize_state()
+    initialize()
     snapshot_times.sort()
     snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
     snapshots = []
@@ -523,7 +546,7 @@ if "trace_particles" in step_flags:
     print("Generating trace plots of particles in phase space.")
     t_max = 2 * np.pi
     t_steps = math.ceil(t_max / dt)
-    x_i, v_i, ke_hist = initialize_state()
+    initialize()
     run()
     fig4 = plt.figure()
     fig4.suptitle(f"Particle trajectories (n={N})")
@@ -536,17 +559,6 @@ if "trace_particles" in step_flags:
         ax4.set_ylabel("v")
     save_plot(f"traces_{N}_particles.pdf")
 
-    # # Plot total kinetic energy over time
-    # fig4_1 = plt.figure()
-    # fig4_1.suptitle(f"Total Kinetic Energy (n={n})")
-    # ax_ke = fig4_1.add_subplot(1, 1, 1)
-    # plt.plot(np.linspace(0, t_max, t_steps), ke * x_scale ** 2)
-    # ax_ke.set_ylabel("Total KE")
-    # ax_ke.set_xlabel("Time")
-    # dt_label = ax_ke.text(
-    #     0.02, 0.95, f"Time step: {dt:.4f}", transform=ax_ke.transAxes
-    # )
-    # save_plot(f"ke_history_{n}_particles_maxt={t_max:.2f}.pdf")
     plt.show()  # Waits for user to close the plots
 
 if "compare_ke" in step_flags:
@@ -565,10 +577,12 @@ if "compare_ke" in step_flags:
     float_eps = np.finfo(float).eps
     y_max = float_eps
     y_min = -float_eps
-    for N in [128, 512, 2048]:
-        for dt in dt_trials:
+    for npart in [128, 512, 2048]:
+        N = npart
+        for trial in dt_trials:
+            dt = trial
             t_steps = t_steps = math.ceil(t_max / dt)
-            x_i, v_i, ke_hist = initialize_state()
+            x_i, v_i, ke_hist = initialize()
             run()
             initial_ke = ke_hist[0]
             ke_rel_scaled = (ke_hist - initial_ke) * L ** 2
@@ -594,10 +608,10 @@ if "performance_testing" in step_flags:
     print("#" * 80 + "\nTesting performance of run():\n" + "#" * 80)
     N = 4098
     dt = 0.05
-    x_i, v_i, ke_hist = initialize_state()
 
     # Run one short iteration to compile particle_push()
     t_steps = 1
+    initialize()
     x_hist = np.zeros((N, t_steps))
     v_hist = np.zeros((N, t_steps))
     run()
@@ -605,13 +619,13 @@ if "performance_testing" in step_flags:
     # Then we can run the full simulation without counting compile time
     t_max = 8 * np.pi
     t_steps = math.ceil(t_max / dt)
-    x_i, v_i, ke_hist = initialize_state()
+    initialize()
 
     start_time = time.perf_counter()
     run()
     end_time = time.perf_counter()
 
-    x_i, v_i, ke_hist = initialize_state()
+    initialize()
     x_hist = np.zeros((N, t_steps))
     v_hist = np.zeros((N, t_steps))
     start_time_slow = time.perf_counter()

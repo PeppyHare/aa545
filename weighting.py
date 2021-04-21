@@ -4,7 +4,7 @@ import numpy as np
 import numba
 
 
-@numba.njit(boundscheck=True)
+@numba.njit
 def weight_particles(x, gp, dx, M, q=1, order=0):
     """Weight particles to grid. Assume x >= 0.
 
@@ -44,7 +44,7 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
     return rho
 
 
-@numba.njit(boundscheck=True)
+@numba.njit
 def weight_field(x, gp, e_j, dx, order=0):
     """Obtain weighted field on particle from the grid.
 

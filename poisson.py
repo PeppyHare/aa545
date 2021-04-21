@@ -7,14 +7,14 @@ import progressbar
 from weighting import weight_particles
 
 
-def setup_poisson(m, boundary_cond="average"):
+def setup_poisson(m):
     """Generate 2nd order finite difference matrix for Poisson equation.
 
     There is a gauge ambiguity inherent to the boundary condition. There are a
-    couple of ways we can set the gauge. The method used is determined by
-    :boundary_cond:
+    couple of ways we can set the gauge. The method used here is to fix the
+    value u_0 = p_0
 
-    Method 1 (boundary_cond="fixed"): We constrain u[0] = p_0. The form of A is:
+    The form of A is:
 
     [1   0   0  ...  0   0   0][u_0  ] = [p_0  ]
     [1  -2   1  ...  0   0   0][u_1  ] = [p_1  ]
@@ -23,54 +23,7 @@ def setup_poisson(m, boundary_cond="average"):
     [0   0   0  ... -2   1   0][u_m-3] = [p_m-3]
     [0   0   0  ...  1  -2   1][u_m-2] = [p_m-2]
     [1   0   0  ...  0   1  -2][u_m-1] = [p_m-1]
-
-    Method 2 (boundary_cond="average"): We set the average of u to zero,
-    adding a Lagrange multiplier. This adds an additional unknown, making the
-    size of A M+1 x M+1.
-
-    [-2  1   0  ...  0   0   1  1][b_0  ] = [p_0  ]
-    [1  -2   1  ...  0   0   0  1][b_1  ] = [p_1  ]
-    [0   1  -2  ...  0   0   0  1][b_2  ] = [p_2  ]
-    [           ...             1][b_j  ] = [p_j  ]
-    [0   0   0  ... -2   1   0  1][b_m-3] = [p_m-3]
-    [0   0   0  ...  1  -2   1  1][b_m-2] = [p_m-2]
-    [1   0   0  ...  0   1  -2  1][b_m-1] = [p_m-1]
-    [1   1   1  ...  1   1   1  0][l    ] = [ 0 ]
     """
-    # # [-2  1   0  ...  0   0   1  1][b_0  ] = [p_0  ]
-    # # [1  -2   1  ...  0   0   0  1][b_1  ] = [p_1  ]
-    # # [0   1  -2  ...  0   0   0  1][b_2  ] = [p_2  ]
-    # # [           ...             1][b_j  ] = [p_j  ]
-    # # [0   0   0  ... -2   1   0  1][b_m-3] = [p_m-3]
-    # # [0   0   0  ...  1  -2   1  1][b_m-2] = [p_m-2]
-    # # [1   0   0  ...  0   1  -2  1][b_m-1] = [p_m-1]
-    # # [1   1   1  ...  1   1   1  0][1/m  ] = [ 0 ]
-    # a = np.zeros((m + 1, m + 1))
-    # for j in range(1, m - 1):
-    #     a[j, j - 1] = 1
-    #     a[j, j] = -2
-    #     a[j, j + 1] = 1
-    #     a[m, j] = 1 / m
-    #     a[j, m] = 1
-    # a[0, 0] = -2
-    # a[0, 1] = 1
-    # a[0, m - 1] = 1
-    # a[0, m] = 1
-    # a[m - 1, 0] = 1
-    # a[m - 1, m - 1] = -2
-    # a[m - 1, m - 2] = 1
-    # a[m, 0] = 1 / m
-    # a[m, m - 1] = 1 / m
-    # return (np.linalg.inv(a), a)
-
-    # This is the good one, but only works for p[0]=0
-    # [1   0   0  ...  0   0   0]
-    # [1  -2   1  ...  0   0   0]
-    # [0   1  -2  ...  0   0   0]
-    # [           ...           ]
-    # [0   0   0  ... -2   1   0]
-    # [0   0   0  ...  1  -2   1]
-    # [1   0   0  ...  0   1  -2]
     a = np.zeros((m, m))
     a[0, 0] = 1
     for j in range(1, m - 1):
@@ -83,7 +36,7 @@ def setup_poisson(m, boundary_cond="average"):
     return (np.linalg.inv(a), a)
 
 
-@numba.njit(boundscheck=True)
+@numba.njit
 def solve_poisson(rho, inv_a, dx):
     """Calculate electric field on the grid.
 
@@ -96,7 +49,7 @@ def solve_poisson(rho, inv_a, dx):
     return np.dot(inv_a, rho) * dx ** 2
 
 
-@numba.njit(boundscheck=True)
+@numba.njit
 def compute_field(rho, inv_a, dx):
     """Differentiate phi to get electric field at grid points."""
     rho[0] = 0
