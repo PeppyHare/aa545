@@ -14,11 +14,11 @@ import numpy as np
 ###############################################################################
 step_flags = [
     # "plot_initial_distributions",
-    "animate_phase_space",
+    # "animate_phase_space",
     # "plot_snapshots",
     # "trace_particles",
+    "no_plots",
     # "compare_ke",
-    # "performance_testing",
 ]
 
 # Number of particles
@@ -55,8 +55,8 @@ q = (wp ** 2) * eps0 / (N * qm)
 rho_bg = -N * q
 
 # Time step and duration
-dt = 0.05
-t_max = 8 * np.pi
+dt = 0.01
+t_max = (100) * 2 * np.pi
 
 # Weighting order. 0 = nearest grid point. 1 = linear weighting
 weighting_order = 0
@@ -66,6 +66,9 @@ repeat_animation = True
 
 # Particle plotting size. 1 is small, 20 is large.
 markersize = 20
+
+# Whether to plot grid lines
+plot_grid_lines = False
 
 # If plotting snapshots, do so at these values of t
 snapshot_times = [0, 0.25 * t_max, 0.5 * t_max, 0.75 * t_max, t_max]

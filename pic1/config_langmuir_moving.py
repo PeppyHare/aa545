@@ -71,9 +71,6 @@ repeat_animation = True
 # Particle plotting size. 1 is small, 20 is large.
 markersize = 20
 
-# Whether to plot grid lines
-plot_grid_lines = False
-
 # If plotting snapshots, do so at these values of t
 snapshot_times = [0, 0.25 * t_max, 0.5 * t_max, 0.75 * t_max, t_max]
 print(f"v_init: {v_init:.2f}")

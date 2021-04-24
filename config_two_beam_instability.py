@@ -26,10 +26,10 @@ step_flags = [
 ]
 
 # Number of particles
-N = 64
+N = 1024
 
 # Number of grid cells. The j=m grid point is identical to j=0.
-M = 32
+M = 512
 
 ###############################################################################
 # Initial Conditions
@@ -40,13 +40,16 @@ M = 32
 
 x_min = -np.pi
 x_max = np.pi
-v_min = -0.5
-v_max = 0.5
-initial_x = np.linspace(x_min, x_max, N + 1)[:-1]
-initial_v = 0.001 * np.sin(initial_x)
-# Split odd/even points by colors for more useful plotting
-initial_x = np.concatenate([initial_x[::2], initial_x[1::2]])
-initial_v = np.concatenate([initial_v[::2], initial_v[1::2]])
+v_min = -2
+v_max = 2
+beam1_x = np.linspace(x_min, x_max, int(N / 2 + 1))[:-1]
+beam1_x += 0.001 * np.sin(beam1_x)
+beam2_x = np.linspace(x_min, x_max, int(N / 2 + 1))[:-1]
+beam2_x -= 0.001 * np.sin(beam2_x)
+beam1_v = np.ones_like(beam1_x)
+beam2_v = -1 * np.ones_like(beam2_x)
+initial_x = np.concatenate([beam1_x, beam2_x])
+initial_v = np.concatenate([beam1_v, beam2_v])
 
 # Plasma electron frequency
 wp = 1
@@ -61,12 +64,10 @@ rho_bg = -N * q
 
 # Time step and duration
 # This should be stable
-dt = 1.0 * (2 / wp)
-# This should be unstable
-# dt = 1.1 * (2 / wp)
-# dt = 0.01
-# Let's go for 8 periods of the plasma frequency
-t_max = 8 * (2 * np.pi / wp)
+dt = 0.1
+# Number of periods of the plasma frequency
+n_periods = 20
+t_max = n_periods * (2 * np.pi / wp)
 
 # Weighting order. 0 = nearest grid point. 1 = linear weighting
 weighting_order = 1
@@ -75,7 +76,7 @@ weighting_order = 1
 repeat_animation = False
 
 # Particle plotting size. 1 is small, 20 is large.
-markersize = 10
+markersize = 2
 
 # Whether to plot grid lines
 plot_grid_lines = False
@@ -84,6 +85,3 @@ plot_grid_lines = False
 snapshot_times = [0, 0.25 * t_max, 0.5 * t_max, 0.75 * t_max, t_max]
 print(f"dt: {dt:.2f}")
 print(f"wp: {wp:.2f}")
-
-measured_wdt = [0.1860, 0.0920]
-trial_wdt = [0.2000, 0.1000]

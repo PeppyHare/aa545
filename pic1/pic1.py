@@ -17,11 +17,10 @@ from poisson import setup_poisson, compute_field
 
 # There are several pre-configured settings and initial conditions. Include them
 # like this:
-# from config_default import (
 # from config_langmuir_displacement import (
 # from config_langmuir_moving import (
-# from config_leapfrog_instability import (
-from config_two_beam_instability import (
+from config_leapfrog_instability import (
+    # from config_default import (
     step_flags,
     N,
     M,
@@ -42,7 +41,6 @@ from config_two_beam_instability import (
     repeat_animation,
     markersize,
     snapshot_times,
-    plot_grid_lines,
 )
 
 ###############################################################################
@@ -318,17 +316,17 @@ def animate(frame):
     if n2 > 0:
         pt_xv2.set_data((x_i[n2:] * L) + x_min, (v_i[n2:] * L))
     if plot_fields:
-        if np.max(np.abs(e_j)) > 2 * efield_max:
-            efield_max += np.max(np.abs(e_j))
-            ax_efield.set_ylim(-efield_max * 2, efield_max * 2)
+        if np.max(np.abs(e_j)) > 1.2 * efield_max:
+            efield_max = np.max(np.abs(e_j))
+            ax_efield.set_ylim(-efield_max * 1.4, efield_max * 1.4)
         pt_efield.set_data(
             (np.concatenate([x_j, np.array([1.0])]) * L) + x_min,
             np.concatenate([e_j, e_j[0:1]]),
         )
     if plot_energy:
-        if fe_hist[frame] + ke_hist[frame] > 2 * energy_max:
-            energy_max += fe_hist[frame] + ke_hist[frame]
-            ax_energy.set_ylim(0, energy_max * 2)
+        if fe_hist[frame] + ke_hist[frame] > 1.2 * energy_max:
+            energy_max = fe_hist[frame] + ke_hist[frame]
+            ax_energy.set_ylim(0, energy_max * 1.4)
         pt_ke.set_data(time_axis, ke_hist)
         pt_fe.set_data(time_axis, fe_hist)
         pt_te.set_data(time_axis, fe_hist + ke_hist)
@@ -384,8 +382,9 @@ if "plot_initial_distributions" in step_flags:
     print(f"Total charge (linear): {np.sum(rho_weight_lin[:-1] * dx)}")
     ax_init_position = fig1.add_subplot(2, 2, 1)
     bins = math.ceil((x_range[1] - x_range[0]) / bin_width)
+    ax_weighted = ax_init_position.twinx()
     # ax_init_position.hist((x_i * L) + x_min, bins=bins, range=x_range)
-    (pt_ngp,) = ax_init_position.step(
+    (pt_ngp,) = ax_weighted.step(
         (x_j * L) + x_min,
         rho_weight_ngp,
         color="r",
@@ -395,7 +394,7 @@ if "plot_initial_distributions" in step_flags:
         label="NGP",
         markersize=5,
     )
-    (pt_linear,) = ax_init_position.plot(
+    (pt_linear,) = ax_weighted.plot(
         (x_j * L) + x_min,
         rho_weight_lin,
         color="g",
@@ -405,13 +404,13 @@ if "plot_initial_distributions" in step_flags:
         label="Linear",
         markersize=5,
     )
-    ax_init_position.legend(
+    ax_weighted.legend(
         [pt_ngp, pt_linear],
         [pt_ngp.get_label(), pt_linear.get_label()],
     )
-    ax_init_position.set_ylim(bottom=0)
+    ax_weighted.set_ylim(bottom=0)
     ax_init_position.set_xlabel(r"$x$")
-    ax_init_position.set_ylabel("Density")
+    ax_init_position.set_ylabel("Count")
     plt.xlim(x_range)
     plt.title("Position")
 
@@ -426,41 +425,24 @@ if "plot_initial_distributions" in step_flags:
     # Plot initial positions in phase space
     ax_init_phase = fig1.add_subplot(2, 2, (3, 4))
     plt.title("Initial phase space")
-    n2 = math.ceil(N / 2)
-    ax_init_phase.plot(
-        (x_i[:n2] * L) + x_min,
-        (v_i[:n2] * L),
-        ".",
-        color="tab:orange",
-        markersize=markersize,
-        label="xv",
-    )
-    ax_init_phase.plot(
-        (x_i[n2:] * L) + x_min,
-        (v_i[n2:] * L),
-        ".",
-        color="tab:cyan",
-        markersize=markersize,
-        label="xv",
-    )
+    plt.plot((x_i * L) + x_min, (v_i * L), "ko", markersize=4)
     plt.xlim(x_range)
     ax_init_phase.set_xlabel(r"$x$")
     ax_init_phase.set_ylabel(r"$v$")
     # Plot grid points
-    if plot_grid_lines:
-        for grid_pt in x_j:
-            ax_init_phase.axvline(
-                (grid_pt * L) + x_min,
-                linestyle="--",
-                color="k",
-                linewidth=0.2,
-            )
-            ax_init_position.axvline(
-                (grid_pt * L) + x_min,
-                linestyle="--",
-                color="k",
-                linewidth=0.2,
-            )
+    for grid_pt in x_j:
+        ax_init_phase.axvline(
+            (grid_pt * L) + x_min,
+            linestyle="--",
+            color="k",
+            linewidth=0.2,
+        )
+        ax_init_position.axvline(
+            (grid_pt * L) + x_min,
+            linestyle="--",
+            color="k",
+            linewidth=0.2,
+        )
     plt.tight_layout()
     save_plot(f"initial_hist_{N}_particles.pdf")
     plt.show()  # Waits for user to close the plot
@@ -519,7 +501,7 @@ if "animate_phase_space" in step_flags:
 
     # Add the grid points to the plot of the fields, but only if there aren't
     # too many of them
-    if x_j.size < 80 and plot_grid_lines:
+    if x_j.size < 80:
         for grid_pt in x_j:
             ax_efield.axvline(
                 (grid_pt * L) + x_min,
