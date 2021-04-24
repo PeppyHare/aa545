@@ -72,9 +72,12 @@ e_j = np.zeros(M)
 energy_max = 0
 efield_max = 0
 
-# Store the history of all particles in phase space
-x_hist = np.zeros((N, t_steps))
-v_hist = np.zeros((N, t_steps))
+# Store up to 500 points in the history of all particles in phase space
+history_steps = min(t_steps, 500)
+subsample_ratio = int(t_steps / history_steps)
+x_hist = np.zeros((N, history_steps + 3))
+v_hist = np.zeros((N, history_steps + 3))
+time_history_axis = np.linspace(0, t_max, history_steps)
 
 # Grid points
 x_j = np.linspace(0, 1, M + 1)[:-1]
@@ -100,7 +103,7 @@ def initialize(x0=initial_x, v0=initial_v):
     """Set initial positions of all particles."""
     global x_i, v_i, t_steps, L, N, M, q, m, qm
     global v_min, v_max
-    global x_hist, v_hist, ke_hist, fe_hist, p_hist
+    global x_hist, v_hist, ke_hist, fe_hist, p_hist, history_steps
     global inv_a, e_i, e_j
 
     x_i = (x0 - x_min) / L
@@ -116,8 +119,8 @@ def initialize(x0=initial_x, v0=initial_v):
     v_i -= (dt / 2) * qm * e_i
 
     # (Re-)initialize state history
-    x_hist = np.zeros((N, t_steps))
-    v_hist = np.zeros((N, t_steps))
+    x_hist = np.zeros((N, history_steps + 3))
+    v_hist = np.zeros((N, history_steps + 3))
 
     # (Re-)initialize total kinetic energy, field energy, momentum
     ke_hist = np.zeros(t_steps)
@@ -144,6 +147,7 @@ def time_step(
     p_hist,
     x_hist,
     v_hist,
+    subsample_ratio,
     nonumba=False,
 ):
     """Evolve state forward in time by ∆t with periodic boundary conditions.
@@ -205,6 +209,7 @@ def time_step(
     v_i += dv
 
     # Push particles forward, now that we have v_i[n+1/2]
+    # print(frame, subsample_ratio, int(frame/subsample_ratio) - 1, ke_hist.size, x_hist.shape)
     for i in numba.prange(x_i.size):
         # numba.prange is like np.arange, but optimized for parallelization
         # across multiple CPU cores
@@ -213,8 +218,9 @@ def time_step(
         # Apply periodic boundary conditions. NumPy uses the definition of floor
         # where floor(-2.5) == -3.
         x_i[i] -= np.floor(x_i[i])
-        x_hist[i][frame] += x_i[i]
-        v_hist[i][frame] += v_i[i]
+        if frame % subsample_ratio == 0:
+            x_hist[i][int(frame/subsample_ratio)] += x_i[i]
+            v_hist[i][int(frame/subsample_ratio)] += v_i[i]
     return x_i, v_i, e_j
 
 
@@ -258,6 +264,7 @@ def run(nonumba=False, showprogress=True, debugprint=False):
                 p_hist=p_hist,
                 x_hist=x_hist,
                 v_hist=v_hist,
+                subsample_ratio=subsample_ratio,
                 nonumba=nonumba,
             )
         else:
@@ -271,6 +278,7 @@ def run(nonumba=False, showprogress=True, debugprint=False):
                 p_hist=p_hist,
                 x_hist=x_hist,
                 v_hist=v_hist,
+                subsample_ratio=subsample_ratio,
                 nonumba=nonumba,
             )
         if showprogress:
@@ -309,6 +317,7 @@ def animate(frame):
         p_hist=p_hist,
         x_hist=x_hist,
         v_hist=v_hist,
+        subsample_ratio=subsample_ratio,
         nonumba=False,
     )
     current_time = frame * dt
@@ -572,13 +581,14 @@ if "plot_snapshots" in step_flags:
             p_hist=p_hist,
             x_hist=x_hist,
             v_hist=v_hist,
+            subsample_ratio=subsample_ratio,
             nonumba=False,
         )
         if frame in snapshot_frames:
             snapshots.append(
                 {
-                    "x": x_hist[:, frame],
-                    "v": v_hist[:, frame],
+                    "x": x_hist[:, int(frame/subsample_ratio)],
+                    "v": v_hist[:, int(frame/subsample_ratio)],
                     "frame": frame,
                 }
             )
@@ -618,7 +628,7 @@ if "no_plots" in step_flags:
     print(f"dt*wp/2: {dt*wp/2:.4f}")
     print(
         "measured w*dt/2:"
-        f" {dt*count_crossings(x_hist[0,:])/(4*t_max/(2*np.pi)):.4f}"
+        f" {dt*count_crossings(ke_hist)/(4*t_max/(2*np.pi)):.4f}"
     )
 
 if "plot_dispersion" in step_flags:
@@ -639,7 +649,7 @@ if "plot_dispersion" in step_flags:
         t_steps = math.ceil(t_max / dt)
         initialize()
         run(showprogress=False)
-        w_measured[idx] = count_crossings(x_hist[0, :]) / (
+        w_measured[idx] = count_crossings(ke_hist) / (
             4 * t_max / (2 * np.pi)
         )
         # print("Crossing counts:")

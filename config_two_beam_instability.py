@@ -17,7 +17,7 @@ import numpy as np
 ###############################################################################
 step_flags = [
     # "plot_initial_distributions",
-    "animate_phase_space",
+    # "animate_phase_space",
     # "plot_snapshots",
     # "plot_dispersion",
     # "no_plots",
@@ -64,9 +64,9 @@ rho_bg = -N * q
 
 # Time step and duration
 # This should be stable
-dt = 0.1
+dt = 0.05
 # Number of periods of the plasma frequency
-n_periods = 20
+n_periods = 2000
 t_max = n_periods * (2 * np.pi / wp)
 
 # Weighting order. 0 = nearest grid point. 1 = linear weighting
