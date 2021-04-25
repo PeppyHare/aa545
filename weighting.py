@@ -1,7 +1,10 @@
+"""Weighting functions."""
 import math
+import time
 
 import numpy as np
 import numba
+import progressbar
 
 
 @numba.njit
@@ -26,17 +29,17 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
 
     # Linear weighting
     elif order == 1:
-        for x_i in x:
-            j = math.floor(x_i / dx)  # 0 <= j <= m
+        for i in numba.prange(x.shape[0]):
+            j = math.floor(x[i] / dx)  # 0 <= j <= m
             # Apply periodic boundary conditions
             if j == M:
                 rho[0] += q / dx
             elif j == M - 1:
-                rho[j] += q * (gp[j] + dx - x_i) / dx ** 2
-                rho[0] += q * (x_i - gp[j]) / dx ** 2
+                rho[j] += q * (gp[j] + dx - x[i]) / dx ** 2
+                rho[0] += q * (x[i] - gp[j]) / dx ** 2
             else:
-                rho[j] += q * (gp[j + 1] - x_i) / dx ** 2
-                rho[j + 1] += q * (x_i - gp[j]) / dx ** 2
+                rho[j] += q * (gp[j + 1] - x[i]) / dx ** 2
+                rho[j + 1] += q * (x[i] - gp[j]) / dx ** 2
     else:
         raise ValueError("Incorrect value 'order', must be 0 or 1.")
     assert np.sum(rho[:-1] * dx) - x.size < 10 ** -6  # charge conservation
@@ -72,15 +75,64 @@ def weight_field(x, gp, e_j, dx, order=0):
             if j == m:
                 e_i[i] = e_j[0]
             elif j == m - 1:
-                e_i[i] = (
-                    (gp[j] + dx - x_i) * e_j[j] + (x_i - gp[j]) * e_j[0]
-                ) / dx
+                e_i[i] = ((gp[j] + dx - x_i) * e_j[j] + (x_i - gp[j]) * e_j[0]) / dx
             else:
-                e_i[i] = (
-                    (gp[j + 1] - x_i) * e_j[j] + (x_i - gp[j]) * e_j[j + 1]
-                ) / dx
+                e_i[i] = ((gp[j + 1] - x_i) * e_j[j] + (x_i - gp[j]) * e_j[j + 1]) / dx
 
         else:
             raise ValueError("Incorrect value 'order', must be 0 or 1.")
 
     return e_i
+
+
+if __name__ == "__main__":
+    print("Testing performance of weighting.py")
+    print("#" * 80)
+    print("Testing performance of weight_particles(order=0)")
+    print("#" * 80)
+    for test_m in [32, 1024, 8096]:
+        for test_n in [64, 512, 4096]:
+            for order in [0, 1]:
+                m = test_m
+                n = test_n
+                t_steps = 1000
+                print(f"m: {m}, n: {n}, order: {order}")
+                grid_pts = np.linspace(0, 1, m)
+                dx = 1 / (m - 1)
+                x = np.random.uniform(0.0, 1.0, n)
+                # Run once to compile weight_particles()
+                rho = weight_particles(x, grid_pts, dx, m, order=order)
+
+                ptime_numba = 0
+                bar = progressbar.ProgressBar(
+                    maxval=t_steps,
+                    widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+                )
+                bar.start()
+                for step in range(t_steps):
+                    x = np.random.uniform(0.0, 1.0, n)
+                    start_time = time.perf_counter()
+                    rho = weight_particles(x, grid_pts, dx, m, order=order)
+                    end_time = time.perf_counter()
+                    ptime_numba += end_time - start_time
+                    bar.update(step + 1)
+                bar.finish()
+
+                ptime_python = 0
+                bar = progressbar.ProgressBar(
+                    maxval=t_steps,
+                    widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+                )
+                bar.start()
+                for step in range(t_steps):
+                    x = np.random.uniform(0.0, 1.0, n)
+                    start_time = time.perf_counter()
+                    weight_particles.py_func(x, grid_pts, dx, m, order=order)
+                    end_time = time.perf_counter()
+                    ptime_python += end_time - start_time
+                    bar.update(step + 1)
+                bar.finish()
+
+                print(f"(numba ) Total elapsed time per step (n={n}): {10**6 * ptime_numba / t_steps:.3f} µs")
+                print(f"(python) Total elapsed time per step (n={n}): {10**6 * ptime_python / t_steps:.3f} µs")
+                print(f"numba speedup: {(ptime_python) / (ptime_numba):.2f} times faster")

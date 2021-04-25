@@ -9,7 +9,8 @@ oscillation frequency from the energy history plot and compare it to the plasma
 frequency. Repeat for several plasma frequency values and plot the deviation of
 the measured frequency from the plasma frequency. Compare with the theoretical
 result for the leap-frog instability to demonstrate phase error and
-instability."""
+instability.
+"""
 import numpy as np
 
 ###############################################################################
@@ -64,11 +65,10 @@ rho_bg = -N * q
 
 # Time step and duration
 # This should be stable
-dt = 0.01
+dt = 0.06
 # Number of periods of the plasma frequency
-n_periods = 105
-# t_max = n_periods * (2 * np.pi / wp)
-t_max = 109
+n_periods = 32
+t_max = n_periods * (2 * np.pi / wp)
 
 # Weighting order. 0 = nearest grid point. 1 = linear weighting
 weighting_order = 1

@@ -1,3 +1,4 @@
+"""Poisson solvers."""
 import time
 
 import numpy as np

@@ -73,3 +73,4 @@ def test_linear_weight_field():
     expected = np.array([10, 8, 1, -0.8, -7.8, 8.2, 10])
     e_i = weight_field(x, grid_pts, e_j, dx, order=1)
     assert np.linalg.norm(expected - e_i) < eps
+

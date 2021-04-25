@@ -3,6 +3,8 @@ kivy
 
 # Any generated images
 plots/*/*.pdf
+plots/*/*.png
+plots/*/*.jpeg
 
 # VScode settings
 .vscode/*

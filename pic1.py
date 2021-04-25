@@ -73,7 +73,7 @@ energy_max = 0
 efield_max = 0
 
 # Store up to 500 points in the history of all particles in phase space
-history_steps = min(t_steps, 5000)
+history_steps = min(t_steps, 500)
 subsample_ratio = math.ceil(t_steps / history_steps)
 x_hist = np.zeros((N, history_steps + 3))
 v_hist = np.zeros((N, history_steps + 3))
@@ -93,10 +93,10 @@ p_hist = np.zeros(t_steps)
 (inv_a, _) = setup_poisson(M)
 
 # If false, disable live plots of energy
-plot_energy = True
+plot_energy = False
 
 # If false, disable live plots of electric field
-plot_fields = True
+plot_fields = False
 
 
 def initialize(x0=initial_x, v0=initial_v):
