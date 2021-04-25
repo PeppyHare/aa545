@@ -16,13 +16,12 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
     :order: = 1: Linear weighting. Particles are assigned to the two nearest
     grid points via linear interpolation.
     """
-
     rho = np.zeros_like(gp)
 
     # Nearest grid point
     if order == 0:
-        for x_i in x:
-            j = round(x_i / dx)
+        for i in numba.prange(x.shape[0]):
+            j = round(x[i] / dx)
             rho[j % M] += q / dx
 
     # Linear weighting

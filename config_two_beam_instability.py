@@ -64,7 +64,7 @@ rho_bg = -N * q
 
 # Time step and duration
 # This should be stable
-dt = 0.05
+dt = 0.01
 # Number of periods of the plasma frequency
 n_periods = 2000
 t_max = n_periods * (2 * np.pi / wp)
