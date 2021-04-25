@@ -73,8 +73,8 @@ energy_max = 0
 efield_max = 0
 
 # Store up to 500 points in the history of all particles in phase space
-history_steps = min(t_steps, 500)
-subsample_ratio = int(t_steps / history_steps)
+history_steps = min(t_steps, 5000)
+subsample_ratio = math.ceil(t_steps / history_steps)
 x_hist = np.zeros((N, history_steps + 3))
 v_hist = np.zeros((N, history_steps + 3))
 time_history_axis = np.linspace(0, t_max, history_steps)
@@ -136,7 +136,7 @@ def initialize(x0=initial_x, v0=initial_v):
 ###############################################################################
 # Time step
 ###############################################################################
-@numba.njit
+@numba.njit(boundscheck=True)
 def time_step(
     frame,
     x_i,
@@ -219,8 +219,8 @@ def time_step(
         # where floor(-2.5) == -3.
         x_i[i] -= np.floor(x_i[i])
         if frame % subsample_ratio == 0:
-            x_hist[i][int(frame/subsample_ratio)] += x_i[i]
-            v_hist[i][int(frame/subsample_ratio)] += v_i[i]
+            x_hist[i][int(frame / subsample_ratio)] += x_i[i]
+            v_hist[i][int(frame / subsample_ratio)] += v_i[i]
     return x_i, v_i, e_j
 
 
@@ -301,7 +301,7 @@ def init_animation():
 
 def animate(frame):
     """Call every time we update animation frame."""
-    global x_i, v_i, dt, ke_hist, L, x_min, x_max
+    global x_i, v_i, dt, ke_hist, L, x_min, x_max, t_steps
     global pt_ke, pt_fe, pt_te, time_axis, pt_xv1, pt_xv2, time_text, ax_energy
     global ke_hist, fe_hist, p_hist, x_hist, v_hist
     global x_j, e_j, pt_efield, energy_max, efield_max, plot_energy, plot_fields
@@ -320,27 +320,28 @@ def animate(frame):
         subsample_ratio=subsample_ratio,
         nonumba=False,
     )
-    current_time = frame * dt
-    time_text.set_text(f"t = {current_time:.2f}")
-    n2 = math.ceil(N / 2)
-    pt_xv1.set_data((x_i[:n2] * L) + x_min, (v_i[:n2] * L))
-    if n2 > 0:
-        pt_xv2.set_data((x_i[n2:] * L) + x_min, (v_i[n2:] * L))
-    if plot_fields:
-        if np.max(np.abs(e_j)) > 2 * efield_max:
-            efield_max += np.max(np.abs(e_j))
-            ax_efield.set_ylim(-efield_max * 2, efield_max * 2)
-        pt_efield.set_data(
-            (np.concatenate([x_j, np.array([1.0])]) * L) + x_min,
-            np.concatenate([e_j, e_j[0:1]]),
-        )
-    if plot_energy:
-        if fe_hist[frame] + ke_hist[frame] > 2 * energy_max:
-            energy_max += fe_hist[frame] + ke_hist[frame]
-            ax_energy.set_ylim(0, energy_max * 2)
-        pt_ke.set_data(time_axis, ke_hist)
-        pt_fe.set_data(time_axis, fe_hist)
-        pt_te.set_data(time_axis, fe_hist + ke_hist)
+    if frame % subsample_ratio == 0:
+        current_time = frame * dt
+        time_text.set_text(f"t = {current_time:.2f}")
+        n2 = math.ceil(N / 2)
+        pt_xv1.set_data((x_i[:n2] * L) + x_min, (v_i[:n2] * L))
+        if n2 > 0:
+            pt_xv2.set_data((x_i[n2:] * L) + x_min, (v_i[n2:] * L))
+        if plot_fields:
+            if np.max(np.abs(e_j)) > 2 * efield_max:
+                efield_max += np.max(np.abs(e_j))
+                ax_efield.set_ylim(-efield_max * 2, efield_max * 2)
+            pt_efield.set_data(
+                (np.concatenate([x_j, np.array([1.0])]) * L) + x_min,
+                np.concatenate([e_j, e_j[0:1]]),
+            )
+        if plot_energy:
+            if fe_hist[frame] + ke_hist[frame] > 2 * energy_max:
+                energy_max += fe_hist[frame] + ke_hist[frame]
+                ax_energy.set_ylim(0, energy_max * 2)
+            pt_ke.set_data(time_axis, ke_hist)
+            pt_fe.set_data(time_axis, fe_hist)
+            pt_te.set_data(time_axis, fe_hist + ke_hist)
     return pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te, pt_efield
 
 
@@ -587,8 +588,8 @@ if "plot_snapshots" in step_flags:
         if frame in snapshot_frames:
             snapshots.append(
                 {
-                    "x": x_hist[:, int(frame/subsample_ratio)],
-                    "v": v_hist[:, int(frame/subsample_ratio)],
+                    "x": x_hist[:, int(frame / subsample_ratio)],
+                    "v": v_hist[:, int(frame / subsample_ratio)],
                     "frame": frame,
                 }
             )
@@ -649,9 +650,7 @@ if "plot_dispersion" in step_flags:
         t_steps = math.ceil(t_max / dt)
         initialize()
         run(showprogress=False)
-        w_measured[idx] = count_crossings(ke_hist) / (
-            4 * t_max / (2 * np.pi)
-        )
+        w_measured[idx] = count_crossings(ke_hist) / (4 * t_max / (2 * np.pi))
         # print("Crossing counts:")
         # print(count_crossings(ke_hist))
         # print(count_crossings(fe_hist))

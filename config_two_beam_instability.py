@@ -66,8 +66,9 @@ rho_bg = -N * q
 # This should be stable
 dt = 0.01
 # Number of periods of the plasma frequency
-n_periods = 2000
-t_max = n_periods * (2 * np.pi / wp)
+n_periods = 105
+# t_max = n_periods * (2 * np.pi / wp)
+t_max = 109
 
 # Weighting order. 0 = nearest grid point. 1 = linear weighting
 weighting_order = 1
