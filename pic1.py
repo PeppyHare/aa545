@@ -5,6 +5,7 @@ Coding project 1: Electrostatic Particle in Cell.
 import math
 import os
 from pathlib import Path
+import datetime
 
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -74,7 +75,7 @@ energy_max = 0
 efield_max = 0
 
 # Store up to 500 points in the history of all particles in phase space
-history_steps = min(t_steps, 500)
+history_steps = min(t_steps, 5000)
 subsample_ratio = math.ceil(t_steps / history_steps)
 x_hist = np.zeros((N, history_steps + 3))
 v_hist = np.zeros((N, history_steps + 3))
@@ -137,7 +138,7 @@ def initialize(x0=initial_x, v0=initial_v):
 ###############################################################################
 # Time step
 ###############################################################################
-@numba.njit(boundscheck=True)
+@numba.njit
 def time_step(
     frame,
     x_i,
@@ -792,12 +793,24 @@ if "instability_growth_regression" in step_flags:
     initialize()
     run()
     # Try and find where field energy goes above 25% of total energy
-    regression_max = t_steps-1
+    ramp_start = 0
+    ramp_end = t_steps - 1
     for idx in range(t_steps):
-        if fe_hist[idx] / ke_hist[idx] > 0.25:
-            regression_max = idx
+        if fe_hist[idx] / ke_hist[idx] > 0.001:
+            ramp_start = idx
             break
-    print(f"Instability occurred at step {regression_max} out of {t_steps}.")
+    for idx in range(t_steps):
+        if fe_hist[idx] / ke_hist[idx] > 0.1:
+            ramp_end = idx
+            break
+    print(
+        f"Instability occurred between steps {ramp_start} and {ramp_end} out of"
+        f" {t_steps}."
+    )
+    lr = stats.linregress(
+        time_axis[ramp_start:ramp_end], np.log(fe_hist[ramp_start:ramp_end])
+    )
+    print(lr)
     fig4 = plt.figure(figsize=(12, 6))
     fig4.suptitle(
         f"Time Evolution (n={N}, wp*dt={wp*dt:.3f}, 1st-order weighting)"
@@ -808,14 +821,15 @@ if "instability_growth_regression" in step_flags:
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
     (pt_te,) = ax_energy.plot(
-        time_axis, np.log(ke_hist + fe_hist), "k-", markersize=1, label="total"
+        time_axis, ke_hist + fe_hist, "k-", markersize=1, label="total"
     )
     (pt_ke,) = ax_energy.plot(
-        time_axis, np.log(ke_hist), "b-", markersize=1, label="ke"
+        time_axis, ke_hist, "b-", markersize=1, label="ke"
     )
     (pt_fe,) = ax_energy.plot(
-        time_axis, np.log(fe_hist), "g-", markersize=1, label="fe"
+        time_axis, fe_hist, "g-", markersize=1, label="fe"
     )
+    plt.yscale("log")
     # ax_energy.set_ylim(0, 1.2 * max(np.log(ke_hist + fe_hist)))
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
@@ -823,6 +837,8 @@ if "instability_growth_regression" in step_flags:
         loc="upper right",
     )
     plt.tight_layout()
-    save_plot("energy_instability_growth.pdf")
+    save_plot(
+        f"energy_instability_growth_{datetime.datetime.now().strftime('%Y-%m-%d:%H:%M:%S')}.pdf"
+    )
 
-    plt.show()  # Waits for user to close the plots
+    # plt.show()  # Waits for user to close the plots
