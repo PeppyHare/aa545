@@ -17,8 +17,8 @@ import numpy as np
 # Settings
 ###############################################################################
 step_flags = [
-    # "plot_initial_distributions",
-    # "animate_phase_space",
+    "plot_initial_distributions",
+    "animate_phase_space",
     # "plot_snapshots",
     # "plot_dispersion",
     # "no_plots",
@@ -36,19 +36,20 @@ M = 512
 # Initial Conditions
 ###############################################################################
 #
-# Two stationary particles separated by L/4
-#
+# Two cold counter-propagating beams with an initial displacement perturbation
+# The condition for instability is k^2 v0^2 < wp^2
 
 x_min = -np.pi
 x_max = np.pi
 v_min = -2
 v_max = 2
+v0 = 0.5
 beam1_x = np.linspace(x_min, x_max, int(N / 2 + 1))[:-1]
 beam1_x += 0.001 * np.sin(beam1_x)
 beam2_x = np.linspace(x_min, x_max, int(N / 2 + 1))[:-1]
 beam2_x -= 0.001 * np.sin(beam2_x)
-beam1_v = np.ones_like(beam1_x)
-beam2_v = -1 * np.ones_like(beam2_x)
+beam1_v = v0 * np.ones_like(beam1_x)
+beam2_v = -v0 * np.ones_like(beam2_x)
 initial_x = np.concatenate([beam1_x, beam2_x])
 initial_v = np.concatenate([beam1_v, beam2_v])
 
@@ -65,7 +66,7 @@ rho_bg = -N * q
 
 # Time step and duration
 # This should be stable
-dt = 0.06
+dt = 0.1
 # Number of periods of the plasma frequency
 n_periods = 32
 t_max = n_periods * (2 * np.pi / wp)

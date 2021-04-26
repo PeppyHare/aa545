@@ -722,15 +722,15 @@ if "plot_energy" in step_flags:
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
     (pt_ke,) = ax_energy.plot(
-        time_axis, ke_hist, "b-", markersize=1, label="ke"
+        time_axis, np.log(ke_hist), "b-", markersize=1, label="ke"
     )
     (pt_fe,) = ax_energy.plot(
-        time_axis, fe_hist, "g-", markersize=1, label="fe"
+        time_axis, np.log(fe_hist), "g-", markersize=1, label="fe"
     )
     (pt_te,) = ax_energy.plot(
-        time_axis, ke_hist + fe_hist, "k-", markersize=1, label="total"
+        time_axis, np.log(ke_hist + fe_hist), "k-", markersize=1, label="total"
     )
-    ax_energy.set_ylim(0, 1.2 * max(ke_hist + fe_hist))
+    ax_energy.set_ylim(0, 1.2 * max(np.log(ke_hist + fe_hist)))
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
@@ -738,6 +738,15 @@ if "plot_energy" in step_flags:
     )
     plt.tight_layout()
     save_plot(f"energy_wpdt_{wp*dt/2:.3f}.pdf")
+    plt.figure()
+    ax = plt.gca()
+    ax.set_title("Field energy")
+    ax.set_xlim(0, t_max)
+    ax.set_ylabel("ln(E_field)")
+    ax.set_xlabel("time")
+    y = np.log(np.sqrt(fe_hist))
+    ax.plot(time_axis, y, "g-", markersize=1)
+    # ax.set_ylim(min(np.log(fe_hist)) - 1, max(np.log(fe_hist)) + 1)
 
     plt.show()  # Waits for user to close the plots
 
