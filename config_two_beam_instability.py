@@ -17,13 +17,14 @@ import numpy as np
 # Settings
 ###############################################################################
 step_flags = [
-    "plot_initial_distributions",
-    "animate_phase_space",
+    # "plot_initial_distributions",
+    # "animate_phase_space",
     # "plot_snapshots",
     # "plot_dispersion",
     # "no_plots",
     # "trace_particles",
     "plot_energy",
+    # "instability_growth_regression",
 ]
 
 # Number of particles

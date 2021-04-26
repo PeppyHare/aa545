@@ -11,6 +11,7 @@ from matplotlib.animation import FuncAnimation
 import numba
 import numpy as np
 import progressbar
+from scipy import stats
 
 from weighting import weight_particles, weight_field
 from poisson import setup_poisson, compute_field
@@ -718,19 +719,18 @@ if "plot_energy" in step_flags:
     ax_energy = fig4.add_subplot(2, 1, (1, 2))
     ax_energy.set_title("Energy")
     ax_energy.set_xlim(0, t_max)
-    # ax_energy.set_ylim(0, 2 * (fe_hist[0] + ke_hist[0]))
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
+    (pt_te,) = ax_energy.plot(
+        time_axis, np.log(ke_hist + fe_hist), "k-", markersize=1, label="total"
+    )
     (pt_ke,) = ax_energy.plot(
         time_axis, np.log(ke_hist), "b-", markersize=1, label="ke"
     )
     (pt_fe,) = ax_energy.plot(
         time_axis, np.log(fe_hist), "g-", markersize=1, label="fe"
     )
-    (pt_te,) = ax_energy.plot(
-        time_axis, np.log(ke_hist + fe_hist), "k-", markersize=1, label="total"
-    )
-    ax_energy.set_ylim(0, 1.2 * max(np.log(ke_hist + fe_hist)))
+    # ax_energy.set_ylim(0, 1.2 * max(np.log(ke_hist + fe_hist)))
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
@@ -738,6 +738,8 @@ if "plot_energy" in step_flags:
     )
     plt.tight_layout()
     save_plot(f"energy_wpdt_{wp*dt/2:.3f}.pdf")
+
+    # Plot of field energy only
     plt.figure()
     ax = plt.gca()
     ax.set_title("Field energy")
@@ -746,7 +748,16 @@ if "plot_energy" in step_flags:
     ax.set_xlabel("time")
     y = np.log(np.sqrt(fe_hist))
     ax.plot(time_axis, y, "g-", markersize=1)
-    # ax.set_ylim(min(np.log(fe_hist)) - 1, max(np.log(fe_hist)) + 1)
+
+    # Plot of ratio between field energy to kinetic energy
+    plt.figure()
+    ax = plt.gca()
+    ax.set_title("Field energy")
+    ax.set_xlim(0, t_max)
+    ax.set_ylabel("E_field/E_kinetic")
+    ax.set_xlabel("time")
+    y = fe_hist / ke_hist
+    ax.plot(time_axis, y, "g-", markersize=1)
 
     plt.show()  # Waits for user to close the plots
 
@@ -775,3 +786,43 @@ if "coupled_oscillators" in step_flags:
     plt.legend([pt_res, pt_exp], ["Measured frequency", "v0"])
     save_plot("coupled_oscillators_dispersion.pdf")
     plt.show()
+
+if "instability_growth_regression" in step_flags:
+    print("Trying to measure instability.")
+    initialize()
+    run()
+    # Try and find where field energy goes above 25% of total energy
+    regression_max = t_steps-1
+    for idx in range(t_steps):
+        if fe_hist[idx] / ke_hist[idx] > 0.25:
+            regression_max = idx
+            break
+    print(f"Instability occurred at step {regression_max} out of {t_steps}.")
+    fig4 = plt.figure(figsize=(12, 6))
+    fig4.suptitle(
+        f"Time Evolution (n={N}, wp*dt={wp*dt:.3f}, 1st-order weighting)"
+    )
+    ax_energy = fig4.add_subplot(2, 1, (1, 2))
+    ax_energy.set_title("Energy")
+    ax_energy.set_xlim(0, t_max)
+    ax_energy.set_ylabel("energy")
+    ax_energy.set_xlabel("time")
+    (pt_te,) = ax_energy.plot(
+        time_axis, np.log(ke_hist + fe_hist), "k-", markersize=1, label="total"
+    )
+    (pt_ke,) = ax_energy.plot(
+        time_axis, np.log(ke_hist), "b-", markersize=1, label="ke"
+    )
+    (pt_fe,) = ax_energy.plot(
+        time_axis, np.log(fe_hist), "g-", markersize=1, label="fe"
+    )
+    # ax_energy.set_ylim(0, 1.2 * max(np.log(ke_hist + fe_hist)))
+    ax_energy.legend(
+        [pt_ke, pt_fe, pt_te],
+        [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
+        loc="upper right",
+    )
+    plt.tight_layout()
+    save_plot("energy_instability_growth.pdf")
+
+    plt.show()  # Waits for user to close the plots
