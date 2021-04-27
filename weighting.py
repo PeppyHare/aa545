@@ -75,9 +75,13 @@ def weight_field(x, gp, e_j, dx, order=0):
             if j == m:
                 e_i[i] = e_j[0]
             elif j == m - 1:
-                e_i[i] = ((gp[j] + dx - x_i) * e_j[j] + (x_i - gp[j]) * e_j[0]) / dx
+                e_i[i] = (
+                    (gp[j] + dx - x_i) * e_j[j] + (x_i - gp[j]) * e_j[0]
+                ) / dx
             else:
-                e_i[i] = ((gp[j + 1] - x_i) * e_j[j] + (x_i - gp[j]) * e_j[j + 1]) / dx
+                e_i[i] = (
+                    (gp[j + 1] - x_i) * e_j[j] + (x_i - gp[j]) * e_j[j + 1]
+                ) / dx
 
         else:
             raise ValueError("Incorrect value 'order', must be 0 or 1.")
@@ -106,7 +110,11 @@ if __name__ == "__main__":
                 ptime_numba = 0
                 bar = progressbar.ProgressBar(
                     maxval=t_steps,
-                    widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+                    widgets=[
+                        progressbar.Bar("=", "[", "]"),
+                        " ",
+                        progressbar.Percentage(),
+                    ],
                 )
                 bar.start()
                 for step in range(t_steps):
@@ -121,7 +129,11 @@ if __name__ == "__main__":
                 ptime_python = 0
                 bar = progressbar.ProgressBar(
                     maxval=t_steps,
-                    widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+                    widgets=[
+                        progressbar.Bar("=", "[", "]"),
+                        " ",
+                        progressbar.Percentage(),
+                    ],
                 )
                 bar.start()
                 for step in range(t_steps):
@@ -133,6 +145,15 @@ if __name__ == "__main__":
                     bar.update(step + 1)
                 bar.finish()
 
-                print(f"(numba ) Total elapsed time per step (n={n}): {10**6 * ptime_numba / t_steps:.3f} µs")
-                print(f"(python) Total elapsed time per step (n={n}): {10**6 * ptime_python / t_steps:.3f} µs")
-                print(f"numba speedup: {(ptime_python) / (ptime_numba):.2f} times faster")
+                print(
+                    f"(numba ) Total elapsed time per step (n={n}):"
+                    f" {10**6 * ptime_numba / t_steps:.3f} µs"
+                )
+                print(
+                    f"(python) Total elapsed time per step (n={n}):"
+                    f" {10**6 * ptime_python / t_steps:.3f} µs"
+                )
+                print(
+                    f"numba speedup: {(ptime_python) / (ptime_numba):.2f} times"
+                    " faster"
+                )

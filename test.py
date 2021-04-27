@@ -1,6 +1,3 @@
-import numpy as np
-
-
 class Configuration:
     a = 1
     b = 2

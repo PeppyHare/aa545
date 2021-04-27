@@ -5,6 +5,7 @@ kivy
 plots/*/*.pdf
 plots/*/*.png
 plots/*/*.jpeg
+plots/*/*.mp4
 
 # VScode settings
 .vscode/*
