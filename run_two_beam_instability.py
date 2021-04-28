@@ -21,20 +21,25 @@ class TwoStreamConfiguration(Configuration):
     plot_grid_lines = False
     n_periods = 20
     wp = 1
+    perturbation = 0.003
+    beam_velocity = 0.2
+    dt = 0.01
+    max_history_steps = 5000
 
     def __init__(self, k, M):
         self.x_min = -np.pi / k
         self.x_max = np.pi / k
         self.M = M
+        self.k = k
         Configuration.__init__(self)
 
     def initialize_particles(self):
-        v0 = 0.15
-        dx = 0.01
+        v0 = self.beam_velocity
+        dx = self.perturbation
         beam1_x = np.linspace(self.x_min, self.x_max, int(self.N / 2 + 1))[:-1]
-        beam1_x += dx * np.sin(beam1_x)
+        beam1_x += dx * np.sin(self.k * beam1_x)
         beam2_x = np.linspace(self.x_min, self.x_max, int(self.N / 2 + 1))[:-1]
-        beam2_x -= dx * np.sin(beam2_x)
+        beam2_x -= dx * np.sin(self.k * beam2_x)
         beam1_v = v0 * np.ones_like(beam1_x)
         beam2_v = -v0 * np.ones_like(beam2_x)
         self.initial_x = np.concatenate([beam1_x, beam2_x])
@@ -49,15 +54,14 @@ def calc_growth_rate(k, M):
 
     c = TwoStreamConfiguration(k, M)
     m = PicModel(c)
-    # plot_initial_distribution(m)
     start = time.perf_counter()
     m.run()
     end = time.perf_counter()
     print(f"Total time: {(end-start)*1000:.4f}ms")
 
-    v0 = 0.2
+    v0 = c.beam_velocity
     wp = c.wp
-    print(f"k: {k}, k*v0: {k*v0}, wp: {wp}")
+    print(f"k: {k}, k*v0/wp: {k*v0/wp:.2f}")
     # Dispersion relation for opposing, equal-strength streams:
     # w = +/- [ k^2 v_0 ^2 + wp ^2 +/- wp*(4 k^2 v0^2 + wp ^2)**(1/2)]**(1/2)
     sol1 = (
@@ -86,9 +90,9 @@ def calc_growth_rate(k, M):
         )
         ** (1 / 2)
     )
-    print(
-        f"Possible w solutions:\n{sol1:.4f}\n{sol2:.4f}\n{sol3:.4f}\n{sol4:.4f}"
-    )
+    # print(
+    #     f"Possible w solutions:\n{sol1:.4f}\n{sol2:.4f}\n{sol3:.4f}\n{sol4:.4f}"
+    # )
 
     # Try to glean the growth rate of the lowest-order instability
     # Try and find where field energy goes above 10% of total energy
@@ -100,11 +104,11 @@ def calc_growth_rate(k, M):
     ramp_start = 0
     ramp_end = t_steps - 1
     for idx in range(t_steps):
-        if fe_hist[idx] / ke_hist[idx] > 0.001:
+        if fe_hist[idx] / ke_hist[idx] > 0.00001:
             ramp_start = idx
             break
     for idx in range(t_steps):
-        if fe_hist[idx] / ke_hist[idx] > 0.1:
+        if fe_hist[idx] / ke_hist[idx] > 0.001:
             ramp_end = idx
             break
     dt = c.dt
@@ -120,26 +124,48 @@ def calc_growth_rate(k, M):
         "Expected growth rate: ",
         expected_rate,
         " measured growth rate: ",
-        lr.slope,
+        lr.slope / 2,
     )
-    plots.animate_phase_space(m, hold=False)
+    # plots.plot_initial_distribution(m)
+    # plots.animate_phase_space(
+    #     m,
+    #     plot_title=(
+    #         f"Phase space animation k: {k}, k*v0/wp: {k*v0/wp:.2f}, dx:"
+    #         f" {c.perturbation}"
+    #     ),
+    #     hold=False,
+    # )
+
     plots.plot_traces(
-        m, max_traces=40, start_at_frame=int(ramp_start / c.subsample_ratio)
+        m,
+        max_traces=30,
+        start_at_frame=int(ramp_start / c.subsample_ratio),
+        plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
     )
-    # plot_snapshots(m, hold=False)
-    # plot_energy_history(m, hold=False)
+
+    plots.plot_snapshots(
+        m,
+        hold=False,
+        plot_title=(
+            f"Snapshots: k={k}, L={c.x_max - c.x_min:.2f},"
+            f" k*v0/wp={k*v0/wp:.2f}"
+        ),
+    )
+    plots.plot_energy_history(m, hold=False)
     # plt.show()
-    return (expected_rate, lr.slope)
+
+    return (expected_rate, lr.slope / 2)
 
 
-k_trials = [1, 2, 3, 4, 5, 6, 7, 8]
+k_trials = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+m_trials = [512, 512, 512, 512, 512, 512, 512, 512, 512, 512]
 n_trials = len(k_trials)
 expects = np.zeros(n_trials)
 results = np.zeros(n_trials)
 inputs = np.zeros(n_trials)
 
 for idx, k in enumerate(k_trials):
-    (expect, result) = calc_growth_rate(k, M=512)
+    (expect, result) = calc_growth_rate(k, M=m_trials[idx])
     expects[idx] = expect
     results[idx] = result
 

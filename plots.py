@@ -24,6 +24,7 @@ def _plot_energy_ax(m: PicModel, ax_energy):
     ax_energy.set_xlim(0, t_max)
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
+    ax_energy.set_yscale("log")
     (pt_te,) = ax_energy.plot(
         time_axis, ke_hist + fe_hist, "k-", markersize=1, label="total"
     )
@@ -33,7 +34,6 @@ def _plot_energy_ax(m: PicModel, ax_energy):
     (pt_fe,) = ax_energy.plot(
         time_axis, fe_hist, "g-", markersize=1, label="fe"
     )
-    plt.yscale("log")
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
@@ -163,7 +163,12 @@ def plot_initial_distribution(m: PicModel, hold=True):
         plt.show()  # Waits for user to close the plot
 
 
-def plot_snapshots(m: PicModel, snapshot_times=None, hold=True):
+def plot_snapshots(
+    m: PicModel,
+    snapshot_times: bool = None,
+    hold: bool = True,
+    plot_title: str = "Time snapshots",
+):
     print("Generating snapshots of state at various time intervals.")
     c = m.c
     d = m.d
@@ -194,8 +199,8 @@ def plot_snapshots(m: PicModel, snapshot_times=None, hold=True):
                 }
             )
     print(f"Sampled {len(snapshots)} snapshots over {t_steps} time steps.")
-    fig = plt.figure()
-    fig.suptitle(f"Time snapshots (n={N})")
+    fig = plt.figure(figsize=(6, 8))
+    fig.suptitle(plot_title)
     num_subplots = len(snapshots)
     idx = 1
     for snapshot in snapshots:
@@ -223,6 +228,7 @@ def plot_traces(
     m: PicModel,
     max_traces: int = 30,
     hold: bool = True,
+    plot_title: str = "Particle traces",
     start_at_frame: int = 0,
 ):
     """Generate trace plots of particles in phase space.
@@ -238,25 +244,20 @@ def plot_traces(
     if not m.has_run:
         m.run()
     N = c.N
-    wp = c.wp
-    dt = c.dt
     x_hist = d.x_hist
     v_hist = d.v_hist
     x_range = c.x_range
     L = c.L
     x_min = c.x_min
     fig = plt.figure(figsize=(12, 8))
-    fig.suptitle(
-        f"Particle Traces (n={N}, wp*dt={wp*dt:.3f}, 1st-order weighting)"
-    )
     ax_xv = fig.add_subplot(211)
-    for i in range(N)[::max_traces]:
+    for i in range(N)[:: int(N / max_traces)]:
         position = (x_hist[i, start_at_frame:] * L) + x_min
         velocity = v_hist[i, start_at_frame:] * L
         ax_xv.plot(position, velocity, ".", markersize=1)
         ax_xv.set_xlabel("x")
         ax_xv.set_ylabel("v")
-        ax_xv.set_title("Particle Traces")
+        ax_xv.set_title(plot_title)
         ax_xv.set_xlim(x_range)
     ax_energy = fig.add_subplot(212)
     _plot_energy_ax(m, ax_energy)
@@ -266,9 +267,18 @@ def plot_traces(
         plt.show()  # Waits for user to close the plots
 
 
-def _init_animation(x_range, v_min, v_max, ax_xv, pt_xv1, pt_xv2):
+def _init_animation(
+    # x_range, v_min, v_max, ax_xv, pt_xv1, pt_xv2, pt_ke, pt_fe, pt_te
+    x_range,
+    v_min,
+    v_max,
+    ax_xv,
+    pt_xv1,
+    pt_xv2,
+):
     ax_xv.set_xlim(x_range)
     ax_xv.set_ylim(v_min, v_max)
+    # return (pt_xv1, pt_xv2, pt_ke, pt_fe, pt_te)
     return (pt_xv1, pt_xv2)
 
 
@@ -276,22 +286,24 @@ def _animate_frame(
     frame,
     x_hist,
     v_hist,
-    ke_hist,
-    fe_hist,
+    # ke_hist,
+    # fe_hist,
     x_min,
     L,
-    time_axis,
-    pt_ke,
-    pt_fe,
-    pt_te,
+    # time_axis,
+    # pt_ke,
+    # pt_fe,
+    # pt_te,
     pt_xv1,
     pt_xv2,
     time_text,
+    vline_t,
     subsample_ratio,
     dt,
 ):
     current_time = frame * dt * subsample_ratio
     time_text.set_text(f"t = {current_time:.2f}")
+    vline_t.set_xdata([current_time, current_time])
     N = x_hist.shape[0]
     n2 = math.ceil(N / 2)
     pt_xv1.set_data((x_hist[:n2, frame] * L) + x_min, (v_hist[:n2, frame] * L))
@@ -299,32 +311,31 @@ def _animate_frame(
         pt_xv2.set_data(
             (x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L)
         )
-    pt_ke.set_data(time_axis, ke_hist)
-    pt_fe.set_data(time_axis, fe_hist)
-    pt_te.set_data(time_axis, fe_hist + ke_hist)
-    return (pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te)
+    # pt_ke.set_data(time_axis, ke_hist)
+    # pt_fe.set_data(time_axis, fe_hist)
+    # pt_te.set_data(time_axis, fe_hist + ke_hist)
+    # return (pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te)
+    return (pt_xv1, pt_xv2, time_text, vline_t)
 
 
 def animate_phase_space(
     m: PicModel,
+    plot_title="Phase space animation",
     repeat: bool = False,
-    plot_grid_lines: bool = True,
     hold: bool = True,
 ):
-    c = m.c
-    d = m.d
     if not m.has_run:
         m.run()
-    N = c.N
-    M = c.M
-    t_max = c.t_max
+    c = m.c
+    d = m.d
+    # t_max = c.t_max
     dt = c.dt
     x_range = c.x_range
     v_range = c.v_range
     markersize = c.markersize
 
     fig = plt.figure(figsize=(12, 8))
-    fig.suptitle(f"n={N}  m={M}  dt={dt:.4f} t_max={t_max:.4f}")
+    fig.suptitle(plot_title)
     ax_xv = plt.subplot2grid((2, 2), (0, 0), colspan=2, rowspan=1)
     ax_energy = plt.subplot2grid((2, 2), (1, 0), colspan=2, rowspan=1)
 
@@ -334,11 +345,15 @@ def animate_phase_space(
     ax_xv.set_xlim(x_range)
     ax_xv.set_ylim(v_range)
 
-    ax_energy.set_title("Energy")
-    ax_energy.set_xlim(0, t_max)
-    ax_energy.set_ylim(0, 1.2 * np.max(d.fe_hist + d.ke_hist))
-    ax_energy.set_ylabel("energy")
-    ax_energy.set_xlabel("time")
+    _plot_energy_ax(m, ax_energy)
+    vline_t = ax_energy.axvline(0, ls='--', color='k', zorder=10)
+
+    # ax_energy.set_title("Energy")
+    # ax_energy.set_xlim(0, t_max)
+    # ax_energy.set_ylim(0, 1.2 * np.max(d.fe_hist + d.ke_hist))
+    # ax_energy.set_ylabel("energy")
+    # ax_energy.set_xlabel("time")
+    # ax_energy.set_yscale("log")
 
     (pt_xv1,) = ax_xv.plot(
         [],
@@ -356,14 +371,19 @@ def animate_phase_space(
         markersize=markersize,
         label="xv",
     )
-    (pt_ke,) = ax_energy.plot([], [], "b-", markersize=1, label="ke")
-    (pt_fe,) = ax_energy.plot([], [], "g-", markersize=1, label="fe")
-    (pt_te,) = ax_energy.plot([], [], "k-", markersize=1, label="total")
-    # plt.yscale("log")
-    ax_energy.legend(
-        [pt_ke, pt_fe, pt_te],
-        [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
-    )
+    # (pt_ke,) = ax_energy.plot(
+    #     c.time_axis, d.ke_hist, "b-", markersize=1, label="ke"
+    # )
+    # (pt_fe,) = ax_energy.plot(
+    #     c.time_axis, d.ke_hist, "g-", markersize=1, label="fe"
+    # )
+    # (pt_te,) = ax_energy.plot(
+    #     c.time_axis, d.ke_hist, "k-", markersize=1, label="total"
+    # )
+    # ax_energy.legend(
+    #     [pt_ke, pt_fe, pt_te],
+    #     [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
+    # )
 
     # Add a label to the frame showing the current time. Updated each time step
     # in update()
@@ -372,17 +392,18 @@ def animate_phase_space(
         _animate_frame,
         x_hist=d.x_hist,
         v_hist=d.v_hist,
-        ke_hist=d.ke_hist,
-        fe_hist=d.fe_hist,
+        # ke_hist=d.ke_hist,
+        # fe_hist=d.fe_hist,
         x_min=c.x_min,
         L=c.L,
-        time_axis=c.time_axis,
-        pt_ke=pt_ke,
-        pt_fe=pt_fe,
-        pt_te=pt_te,
+        # time_axis=c.time_axis,
+        # pt_ke=pt_ke,
+        # pt_fe=pt_fe,
+        # pt_te=pt_te,
         pt_xv1=pt_xv1,
         pt_xv2=pt_xv2,
         time_text=time_text,
+        vline_t=vline_t,
         subsample_ratio=c.subsample_ratio,
         dt=dt,
     )
@@ -394,6 +415,9 @@ def animate_phase_space(
         ax_xv=ax_xv,
         pt_xv1=pt_xv1,
         pt_xv2=pt_xv2,
+        # pt_ke=pt_ke,
+        # pt_fe=pt_fe,
+        # pt_te=pt_te,
     )
     # Evolve positions until t_max. Animate particle positions in phase space.
     animation = FuncAnimation(
@@ -402,7 +426,7 @@ def animate_phase_space(
         frames=range(d.x_hist.shape[1]),
         init_func=init_animation,
         blit=True,
-        interval=1,
+        interval=4,
         repeat=repeat,
     )
     plt.tight_layout()
@@ -419,140 +443,4 @@ def animate_phase_space(
             animation_name,
             progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
         )
-
-
-###############################################################################
-# TODO: old animation code using FuncAnimation
-# ###############################################################################
-# def init_animation():
-#     """Animation initialization."""
-#     global ax_xv, pt_xv1, pt_xv2, x_range, v_min, v_max
-#     ax_xv.set_xlim(x_range)
-#     ax_xv.set_ylim(v_min, v_max)
-#     return (pt_xv1, pt_xv2)
-
-
-# def animate(frame):
-#     """Call every time we update animation frame."""
-#     global x_i, v_i, dt, ke_hist, L, x_min, x_max, t_steps
-#     global pt_ke, pt_fe, pt_te, time_axis, pt_xv1, pt_xv2, time_text, ax_energy
-#     global ke_hist, fe_hist, p_hist, x_hist, v_hist
-#     global x_j, e_j, pt_efield, energy_max, efield_max, plot_energy, plot_fields
-#     if frame == 0:
-#         x_i, v_i, ke_hist = initialize()
-#     x_i, v_i, e_j = time_step(
-#         frame,
-#         x_i=x_i,
-#         v_i=v_i,
-#         x_j=x_j,
-#         ke_hist=ke_hist,
-#         fe_hist=fe_hist,
-#         p_hist=p_hist,
-#         x_hist=x_hist,
-#         v_hist=v_hist,
-#         subsample_ratio=subsample_ratio,
-#         nonumba=False,
-#     )
-#     if frame % subsample_ratio == 0:
-#         current_time = frame * dt
-#         time_text.set_text(f"t = {current_time:.2f}")
-#         n2 = math.ceil(N / 2)
-#         pt_xv1.set_data((x_i[:n2] * L) + x_min, (v_i[:n2] * L))
-#         if n2 > 0:
-#             pt_xv2.set_data((x_i[n2:] * L) + x_min, (v_i[n2:] * L))
-#         if plot_fields:
-#             if np.max(np.abs(e_j)) > 2 * efield_max:
-#                 efield_max += np.max(np.abs(e_j))
-#                 ax_efield.set_ylim(-efield_max * 2, efield_max * 2)
-#             pt_efield.set_data(
-#                 (np.concatenate([x_j, np.array([1.0])]) * L) + x_min,
-#                 np.concatenate([e_j, e_j[0:1]]),
-#             )
-#         if plot_energy:
-#             if fe_hist[frame] + ke_hist[frame] > 2 * energy_max:
-#                 energy_max += fe_hist[frame] + ke_hist[frame]
-#                 ax_energy.set_ylim(0, energy_max * 2)
-#             pt_ke.set_data(time_axis, ke_hist)
-#             pt_fe.set_data(time_axis, fe_hist)
-#             pt_te.set_data(time_axis, fe_hist + ke_hist)
-#     return pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te, pt_efield
-
-# def do_animation():
-#     print("Generating animation of phase space over time.")
-#     initialize()
-#     bigfig = plt.figure(figsize=(12, 8))
-#     bigfig.suptitle(f"n={N}  m={M}  dt={dt:.4f} t_max={t_max:.4f}")
-#     ax_xv = plt.subplot2grid((2, 2), (0, 0), colspan=2, rowspan=1)
-#     ax_energy = plt.subplot2grid((2, 2), (1, 0))
-#     ax_efield = plt.subplot2grid((2, 2), (1, 1))
-
-#     ax_xv.set_title("Phase space animation")
-#     ax_xv.set_ylabel("v")
-#     ax_xv.set_xlabel("x")
-#     ax_xv.set_xlim(x_range)
-#     ax_xv.set_ylim(v_range)
-
-#     ax_energy.set_title("Energy")
-#     ax_energy.set_xlim(0, t_max)
-#     # ax_energy.set_ylim(0, 2 * (fe_hist[0] + ke_hist[0]))
-#     ax_energy.set_ylabel("energy")
-#     ax_energy.set_xlabel("time")
-
-#     ax_efield.set_title("Fields")
-#     ax_efield.set_xlim(x_range)
-#     ax_efield.set_ylim(v_range)
-#     ax_efield.set_ylabel("Electric field")
-#     ax_efield.set_xlabel("x")
-
-#     (pt_xv1,) = ax_xv.plot(
-#         [],
-#         [],
-#         ".",
-#         color="tab:orange",
-#         markersize=markersize,
-#         label="xv",
-#     )
-#     (pt_xv2,) = ax_xv.plot(
-#         [],
-#         [],
-#         ".",
-#         color="tab:cyan",
-#         markersize=markersize,
-#         label="xv",
-#     )
-#     (pt_ke,) = ax_energy.plot([], [], "b-", markersize=1, label="ke")
-#     (pt_fe,) = ax_energy.plot([], [], "g-", markersize=1, label="fe")
-#     (pt_te,) = ax_energy.plot([], [], "k-", markersize=1, label="total")
-#     ax_energy.legend(
-#         [pt_ke, pt_fe, pt_te],
-#         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
-#     )
-#     (pt_efield,) = ax_efield.plot([], [], "c", label="efield")
-
-#     # Add the grid points to the plot of the fields, but only if there aren't
-#     # too many of them
-#     if x_j.size < 80 and plot_grid_lines:
-#         for grid_pt in x_j:
-#             ax_efield.axvline(
-#                 (grid_pt * L) + x_min,
-#                 linestyle="--",
-#                 color="k",
-#                 linewidth=0.2,
-#             )
-
-#     # Add a label to the frame showing the current time. Updated each time step
-#     # in update()
-#     time_text = ax_xv.text(0.02, 0.95, "", transform=ax_xv.transAxes)
-
-#     # Evolve positions until t_max. Animate particle positions in phase space.
-#     animation = FuncAnimation(
-#         bigfig,
-#         animate,
-#         frames=t_steps,
-#         init_func=init_animation,
-#         blit=True,
-#         interval=1,
-#         repeat=repeat_animation,
-#     )
-#     plt.tight_layout()
-#     plt.show()  # Waits for user to close the plot
+        plt.close(fig)

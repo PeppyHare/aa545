@@ -47,6 +47,9 @@ class Configuration:
     plot_energy = False
     # If false, disable live plots of electric field
     plot_fields = False
+    # Max number of time steps to hold in memory.
+    # If t_steps greater than this, subsampling will occur.
+    max_history_steps = 5000
 
     def __init__(self):
         """Return a valid configuration for PICModel."""
@@ -75,7 +78,7 @@ class Configuration:
         # Particle mass
         self.m = self.q / self.qm
         # Number of subsampled frames to hold in memory
-        self.history_steps = min(self.t_steps, 5000)
+        self.history_steps = min(self.t_steps, self.max_history_steps)
         # State of all particles is stored every {subsample_ratio} time steps
         self.subsample_ratio = math.ceil(self.t_steps / self.history_steps)
         # Finite difference matrix used to solve Poisson equation
