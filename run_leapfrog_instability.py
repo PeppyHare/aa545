@@ -15,6 +15,7 @@ import numpy as np
 from configuration import Configuration
 from model import PicModel
 from util import count_crossings
+import plots
 
 
 class LeapfrogInstabilityConfiguration(Configuration):
@@ -41,7 +42,7 @@ class LeapfrogInstabilityConfiguration(Configuration):
 
 c = LeapfrogInstabilityConfiguration()
 m = PicModel(c)
-m.plot_initial_distribution()
+plots.plot_initial_distribution(m)
 m.run()
 # Get the data from the run
 d = m.d

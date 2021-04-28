@@ -10,10 +10,13 @@ import time
 import numpy as np
 from scipy import stats
 from matplotlib import pyplot as plt
+from matplotlib.gridspec import GridSpec
 
 from configuration import Configuration
 from model import PicModel
 import plots
+from util import save_plot
+from weighting import weight_particles
 
 
 class TwoStreamConfiguration(Configuration):
@@ -21,14 +24,14 @@ class TwoStreamConfiguration(Configuration):
     plot_grid_lines = False
     n_periods = 20
     wp = 1
-    perturbation = 0.003
+    perturbation = 0.001
     beam_velocity = 0.2
     dt = 0.01
-    max_history_steps = 5000
+    max_history_steps = 1000
 
     def __init__(self, k, M):
-        self.x_min = -np.pi / k
-        self.x_max = np.pi / k
+        self.x_min = -np.pi
+        self.x_max = np.pi
         self.M = M
         self.k = k
         Configuration.__init__(self)
@@ -126,33 +129,69 @@ def calc_growth_rate(k, M):
         " measured growth rate: ",
         lr.slope / 2,
     )
+
+    # Let's see how much we can fit in one fig
+    fig = plt.figure(figsize=(12, 8))
+    fig.suptitle(f"k={k}, k*v0/wp={k*v0/c.wp:.2f}, M={M}, N={c.N}")
+    gs = GridSpec(2, 2, width_ratios=[1, 1], height_ratios=[1, 1])
+    ax_init = fig.add_subplot(gs[0])
+    ax_init.set_title("Initial perturbation")
+    ax_init.set_ylabel(r"$\rho")
+    ax_init.set_xlabel("x")
+    beam1_x = c.initial_x[: int(c.N / 2)]
+    beam2_x = c.initial_x[int(c.N / 2) :]
+    x_j = c.x_j
+    x_j_unorm = (c.x_j * c.L) + c.x_min
+    rho1 = weight_particles(beam1_x, x_j, c.dx, c.M, q=1, order=1)
+    rho2 = weight_particles(beam2_x, x_j, c.dx, c.M, q=-1, order=1)
+    ax_init.plot(
+        x_j_unorm,
+        rho1,
+        ".",
+        color="tab:orange",
+        markersize=c.markersize,
+        label="xv",
+    )
+    ax_init.plot(
+        x_j_unorm,
+        rho2,
+        ".",
+        color="tab:cyan",
+        markersize=c.markersize,
+        label="xv",
+    )
+
+    ax_energy = fig.add_subplot(gs[1])
+    plots._plot_energy_ax(m, ax_energy)
+    plt.tight_layout()
     # plots.plot_initial_distribution(m)
+
+    # plots.plot_traces(
+    #     m,
+    #     max_traces=30,
+    #     start_at_frame=int(ramp_start / c.subsample_ratio),
+    #     plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
+    #     hold=False
+    # )
+    # plots.plot_snapshots(
+    #     m,
+    #     hold=False,
+    #     plot_title=(
+    #         f"Snapshots: k={k}, L={c.x_max - c.x_min:.2f},"
+    #         f" k*v0/wp={k*v0/wp:.2f}"
+    #     ),
+    # )
+    # plots.plot_energy_history(m, hold=False)
     # plots.animate_phase_space(
     #     m,
     #     plot_title=(
     #         f"Phase space animation k: {k}, k*v0/wp: {k*v0/wp:.2f}, dx:"
     #         f" {c.perturbation}"
     #     ),
-    #     hold=False,
+    #     repeat=True,
+    #     hold=True,
     # )
-
-    plots.plot_traces(
-        m,
-        max_traces=30,
-        start_at_frame=int(ramp_start / c.subsample_ratio),
-        plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
-    )
-
-    plots.plot_snapshots(
-        m,
-        hold=False,
-        plot_title=(
-            f"Snapshots: k={k}, L={c.x_max - c.x_min:.2f},"
-            f" k*v0/wp={k*v0/wp:.2f}"
-        ),
-    )
-    plots.plot_energy_history(m, hold=False)
-    # plt.show()
+    plt.show()
 
     return (expected_rate, lr.slope / 2)
 

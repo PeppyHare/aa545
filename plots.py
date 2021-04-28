@@ -25,15 +25,9 @@ def _plot_energy_ax(m: PicModel, ax_energy):
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
     ax_energy.set_yscale("log")
-    (pt_te,) = ax_energy.plot(
-        time_axis, ke_hist + fe_hist, "k-", markersize=1, label="total"
-    )
-    (pt_ke,) = ax_energy.plot(
-        time_axis, ke_hist, "b-", markersize=1, label="ke"
-    )
-    (pt_fe,) = ax_energy.plot(
-        time_axis, fe_hist, "g-", markersize=1, label="fe"
-    )
+    (pt_te,) = ax_energy.plot(time_axis, ke_hist + fe_hist, "k-", markersize=1, label="total")
+    (pt_ke,) = ax_energy.plot(time_axis, ke_hist, "b-", markersize=1, label="ke")
+    (pt_fe,) = ax_energy.plot(time_axis, fe_hist, "g-", markersize=1, label="fe")
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
@@ -42,9 +36,7 @@ def _plot_energy_ax(m: PicModel, ax_energy):
     return ax_energy
 
 
-def plot_energy_history(
-    m: PicModel, plot_title="Time evolution of energy", hold=True
-):
+def plot_energy_history(m: PicModel, plot_title="Time evolution of energy", hold=True):
     """Generate log-log plot of the total kinetic and field energy history."""
     print("Generating plots of the total energy history.")
     fig = plt.figure(figsize=(12, 6))
@@ -52,9 +44,10 @@ def plot_energy_history(
     ax_energy = fig.add_subplot(2, 1, (1, 2))
     _plot_energy_ax(m, ax_energy)
     plt.tight_layout()
-    save_plot(
-        f"energy_instability_growth_{datetime.datetime.now().strftime('%Y-%m-%d:%H:%M:%S')}.pdf"
-    )
+    now_seconds = (
+        datetime.datetime.now() - datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    ).total_seconds()
+    save_plot(f"energy_instability_growth_{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}.pdf")
     if hold:
         plt.show()  # Waits for user to close the plots
 
@@ -76,30 +69,30 @@ def plot_initial_distribution(m: PicModel, hold=True):
     x_j_unorm = (c.x_j * c.L) + c.x_min
 
     # Plot initial weighted particle positions on the grid
-    rho_weight_ngp = weight_particles(x_i, x_j, c.dx, c.M, order=0)
+    rho_weight_ngp = weight_particles(np.sort(x_i), x_j, c.dx, c.M, order=0)
     print(f"Total charge (ngp): {np.sum(rho_weight_ngp * c.dx)}")
-    rho_weight_lin = weight_particles(x_i, x_j, c.dx, c.M, order=1)
+    rho_weight_lin = weight_particles(np.sort(x_i), x_j, c.dx, c.M, order=1)
     print(f"Total charge (linear): {np.sum(rho_weight_lin * c.dx)}")
     ax_init_position = fig1.add_subplot(2, 2, 1)
     (pt_ngp,) = ax_init_position.step(
-        x_j_unorm,
+        np.sort(x_j_unorm),
         rho_weight_ngp,
         color="r",
         marker="o",
         where="mid",
-        linewidth=2,
+        linewidth=1,
         label="NGP",
-        markersize=5,
+        markersize=1,
     )
     (pt_linear,) = ax_init_position.plot(
-        x_j_unorm,
+        np.sort(x_j_unorm),
         rho_weight_lin,
         color="g",
         marker="o",
         linestyle="--",
         linewidth=2,
         label="Linear",
-        markersize=5,
+        markersize=1,
     )
     ax_init_position.legend(
         [pt_ngp, pt_linear],
@@ -308,9 +301,7 @@ def _animate_frame(
     n2 = math.ceil(N / 2)
     pt_xv1.set_data((x_hist[:n2, frame] * L) + x_min, (v_hist[:n2, frame] * L))
     if n2 > 0:
-        pt_xv2.set_data(
-            (x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L)
-        )
+        pt_xv2.set_data((x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L))
     # pt_ke.set_data(time_axis, ke_hist)
     # pt_fe.set_data(time_axis, fe_hist)
     # pt_te.set_data(time_axis, fe_hist + ke_hist)
@@ -324,6 +315,15 @@ def animate_phase_space(
     repeat: bool = False,
     hold: bool = True,
 ):
+    """Generate an animation of the particles in phase space over time.
+
+    The positions of all particles in phase space are plotted alongside the
+    history of the total energy, the field potential energy, and the total
+    kinetic energy.
+
+    Important Note: Using hold=False will save a .mp4 of the animation to disk,
+    but requires ffmpeg to be installed and accessible on the PATH.
+    """
     if not m.has_run:
         m.run()
     c = m.c
@@ -346,7 +346,7 @@ def animate_phase_space(
     ax_xv.set_ylim(v_range)
 
     _plot_energy_ax(m, ax_energy)
-    vline_t = ax_energy.axvline(0, ls='--', color='k', zorder=10)
+    vline_t = ax_energy.axvline(0, ls="--", color="k", zorder=10)
 
     # ax_energy.set_title("Energy")
     # ax_energy.set_xlim(0, t_max)
@@ -434,13 +434,17 @@ def animate_phase_space(
         plt.show()  # Waits for user to close the plot
     else:
         create_folder(os.path.join(os.getcwd(), "plots", "pic1"))
+        now_seconds = (
+            datetime.datetime.now() - datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        ).total_seconds()
         animation_name = os.path.join(
             "plots",
             "pic1",
-            f"animation_{datetime.datetime.now().strftime('%Y-%m-%d:%H:%M:%S')}.mp4",
+            f"animation_{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}.mp4",
         )
         animation.save(
             animation_name,
             progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
         )
         plt.close(fig)
+        print(f"Saved animation {animation_name} to disk.")

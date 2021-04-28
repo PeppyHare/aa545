@@ -7,8 +7,8 @@ import numba
 import progressbar
 
 
-@numba.njit
-def weight_particles(x, gp, dx, M, q=1, order=0):
+@numba.njit(boundscheck=True)
+def weight_particles(x, gp, dx, M, q=1, order=1):
     """Weight particles to grid. Assume x >= 0.
 
     Weighting function order determined by value of :order:. Boundary is assumed
@@ -47,7 +47,7 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
 
 
 @numba.njit
-def weight_field(x, gp, e_j, dx, order=0):
+def weight_field(x, gp, e_j, dx, order=1):
     """Obtain weighted field on particle from the grid.
 
     Weighting function order determined by value of :order:. Boundary is assumed
