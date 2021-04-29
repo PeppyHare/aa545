@@ -36,7 +36,7 @@ class SHMConfiguration(Configuration):
 
 c = SHMConfiguration()
 m = PicModel(c)
-# plots.plot_initial_distribution(m)
+plots.plot_initial_distribution(m)
 m.run()
 # Get the data from the run
 d = m.d

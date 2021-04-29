@@ -18,9 +18,6 @@ from util import save_plot
 from weighting import weight_particles
 
 
-# plt.style.use("dark_background")
-
-
 class TwoStreamConfiguration(Configuration):
     plot_grid_lines = False
     wp = 1
@@ -53,9 +50,11 @@ class TwoStreamConfiguration(Configuration):
         v0 = self.beam_velocity
         dx = self.perturbation
         beam1_x = np.linspace(self.x_min, self.x_max, int(self.N / 2) + 1)[:-1]
-        beam1_x += dx * np.sin(self.k * beam1_x)
+        shift = dx * np.sin(self.k * beam1_x)
+        shift -= shift[0]
+        beam1_x += shift
         beam2_x = np.linspace(self.x_min, self.x_max, int(self.N / 2) + 1)[:-1]
-        beam2_x -= dx * np.sin(self.k * beam2_x)
+        # beam2_x -= shift
         beam1_v = v0 * np.ones_like(beam1_x)
         beam2_v = -v0 * np.ones_like(beam2_x)
         self.initial_x = np.concatenate([beam1_x, beam2_x])
@@ -123,6 +122,59 @@ def calc_growth_rate(
     #     f"Possible w solutions:\n{sol1:.4f}\n{sol2:.4f}\n{sol3:.4f}\n{sol4:.4f}"
     # )
 
+    # Plot the initial density displacement for each beam
+    fig = plt.figure(figsize=(12, 8))
+    fig.suptitle(f"k={k}, k*v0/wp={k*v0/c.wp:.2f}, M={M}, N={c.N}")
+    ax_init = fig.add_subplot()
+    ax_init.set_title("Initial perturbation")
+    ax_init.set_ylabel(r"$\rho$")
+    ax_init.set_xlabel("x")
+    halfway = int(c.N / 2)
+    beam1_x = (c.initial_x[:halfway] - c.x_min) / c.L
+    beam2_x = (c.initial_x[halfway:] - c.x_min) / c.L
+    x_j = c.x_j
+    x_j_unorm = (c.x_j * c.L) + c.x_min
+    rho1 = (
+        weight_particles(
+            beam1_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
+        )
+        - c.rho_bg / 2
+    )
+    rho2 = (
+        weight_particles(
+            beam2_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
+        )
+        - c.rho_bg / 2
+    )
+    ax_init.plot(
+        x_j_unorm,
+        rho1 - np.average(rho1),
+        ".",
+        color="tab:orange",
+        markersize=c.markersize,
+        label="xv",
+    )
+    ax_init.plot(
+        x_j_unorm,
+        rho2 - np.average(rho2),
+        ".",
+        color="tab:cyan",
+        markersize=c.markersize,
+        label="xv",
+    )
+    ax_init.set_xlim(c.x_min, c.x_max)
+    # for grid_pt in x_j_unorm:
+    #     ax_init.axvline(
+    #         grid_pt,
+    #         linestyle="--",
+    #         color="k",
+    #         linewidth=0.1,
+    #     )
+    # ax_field = fig.add_subplot(212)
+    # ax_field.plot(m.d.e_j)
+    save_plot(f"two_stream_initial_density_k={k}.pdf")
+    plt.show()
+
     # Try to glean the growth rate of the lowest-order instability
     # Try and find where field energy goes above 10% of total energy
     d = m.d
@@ -156,84 +208,17 @@ def calc_growth_rate(
         lr.slope / 2,
     )
 
-    # Let's see how much we can fit in one fig
-    fig = plt.figure(figsize=(12, 8))
-    fig.suptitle(f"k={k}, k*v0/wp={k*v0/c.wp:.2f}, M={M}, N={c.N}")
-    ax_init = fig.add_subplot()
-    ax_init.set_title("Initial perturbation")
-    ax_init.set_ylabel(r"$\rho$")
-    ax_init.set_xlabel("x")
-    halfway = int(c.N / 2)
-    beam1_x = (c.initial_x[:halfway] - c.x_min) / c.L
-    beam2_x = (c.initial_x[halfway:] - c.x_min) / c.L
-    x_j = c.x_j
-    x_j_unorm = (c.x_j * c.L) + c.x_min
-    rho1 = (
-        weight_particles(
-            beam1_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
-        )
-        - c.rho_bg / 2
-    )
-    rho2 = (
-        weight_particles(
-            beam2_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
-        )
-        - c.rho_bg / 2
-    )
-    ax_init.plot(
-        x_j_unorm,
-        rho1,
-        ".",
-        color="tab:orange",
-        markersize=c.markersize,
-        label="xv",
-    )
-    ax_init.plot(
-        x_j_unorm,
-        rho2,
-        ".",
-        color="tab:cyan",
-        markersize=c.markersize,
-        label="xv",
-    )
-    ax_init.set_xlim(c.x_min, c.x_max)
-    for grid_pt in x_j_unorm:
-        ax_init.axvline(
-            grid_pt,
-            linestyle="--",
-            color="k",
-            linewidth=0.1,
-        )
-    save_plot(f"two_stream_initial_density_k={k}.pdf")
-    plt.show()
-
     # ax_energy = fig.add_subplot(gs[1])
     # plots._plot_energy_ax(m, ax_energy)
     # plt.tight_layout()
     # plots.plot_initial_distribution(m)
 
-    # plots.plot_traces(
-    #     m,
-    #     max_traces=30,
-    #     start_at_frame=int(ramp_start / c.subsample_ratio),
-    #     plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
-    #     hold=False,
-    # # )
-    # snapshots_title = (
-    #     f"Snapshots: $k={k}, L={c.x_max - c.x_min:.2f},"
-    #     f" kv_0/\omega_p={k*v0/wp:.2f}$"
-    # )
-    # plots.plot_snapshots(
-    #     m,
-    #     hold=True,
-    #     plot_title=(snapshots_title),
-    # )
-    energy_title = (
-        f"Total Energy over Time: $k={k}, L={c.x_max - c.x_min:.2f},"
-        f" kv_0/\omega_p={k*v0/wp:.2f}$"
-    )
-    ax_energy = plots.plot_energy_history(
-        m, hold=False, plot_title=energy_title
+    ax_energy = plots.plot_traces(
+        m,
+        max_traces=25,
+        start_at_frame=int(ramp_start / c.subsample_ratio),
+        plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
+        hold=False,
     )
     ax_energy.plot(
         time_axis,
@@ -243,6 +228,33 @@ def calc_growth_rate(
         label="fit",
     )
     ax_energy.set_ylim(min(d.fe_hist), 10 * max(d.fe_hist + d.ke_hist))
+    save_plot(f"two-stream-traces-k={k}.pdf")
+    snapshots_title = (
+        f"Snapshots: $k={k}, L={c.x_max - c.x_min:.2f},"
+        f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    )
+    plots.plot_snapshots(
+        m,
+        hold=True,
+        plot_title=(snapshots_title),
+    )
+    velocity_snapshots_title = (
+        f"Evolution of $f(v)$: $k={k}, L={c.x_max - c.x_min:.2f},"
+        f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    )
+    plots.plot_snapshots_velocity(
+        m,
+        hold=True,
+        plot_title=(velocity_snapshots_title),
+    )
+    energy_title = (
+        f"Total Energy over Time: $k={k}, L={c.x_max - c.x_min:.2f},"
+        f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    )
+    ax_energy = plots.plot_energy_history(
+        m, hold=False, plot_title=energy_title
+    )
+
     plt.figure()
     plt.plot(time_axis, d.fe_hist / d.ke_hist)
     plt.yscale("log")
@@ -267,32 +279,97 @@ k_trials = []
 expects = []
 results = []
 
-# calc_growth_rate(  # Final keep this!
-#     k=1,
-#     M=512,
-#     N=1024,
-#     ulim=10 ** -4,
-#     llim=10 ** -6,
-#     perturbation=0.001,
-#     expects=expects,
-#     results=results,
-#     k_trials=k_trials,
-# )
-# calc_growth_rate(
-#     k=2,
-#     M=512,
-#     N=1024,
-#     ulim=10 ** -1,
-#     llim=10 ** -3,
-#     perturbation=0.001,
-#     expects=expects,
-#     results=results,
-#     k_trials=k_trials,
-# )
 calc_growth_rate(
     k=1,
-    M=128,
-    N=256,
+    M=512,
+    N=1024,
+    ulim=10 ** -4,
+    llim=10 ** -6,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+)
+calc_growth_rate(
+    k=2,
+    M=512,
+    N=1024,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+)
+calc_growth_rate(
+    k=3,
+    M=512,
+    N=1024,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+    n_periods=10,
+    dt=0.05,
+)
+calc_growth_rate(
+    k=4,
+    M=512,
+    N=1024,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+    n_periods=10,
+    dt=0.05,
+)
+calc_growth_rate(
+    k=5,
+    M=512,
+    N=1024,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+    n_periods=10,
+    dt=0.05,
+)
+calc_growth_rate(
+    k=6,
+    M=512,
+    N=1024,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+    n_periods=10,
+    dt=0.05,
+)
+calc_growth_rate(
+    k=7,
+    M=512,
+    N=1024,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+    n_periods=10,
+    dt=0.05,
+)
+calc_growth_rate(
+    k=8,
+    M=512,
+    N=1024,
     ulim=10 ** -1,
     llim=10 ** -3,
     perturbation=0.0001,
@@ -305,9 +382,15 @@ calc_growth_rate(
 
 
 fig = plt.figure()
-plt.plot(k_trials, expects, "-o", color="cyan", label="expected")
-plt.plot(k_trials, results, "o", color="orange", label="measured")
+plt.plot(
+    np.array(k_trials) * 0.2, expects, "-o", color="cyan", label="expected"
+)
+plt.plot(
+    np.array(k_trials) * 0.2, results, "o", color="orange", label="measured"
+)
+plt.title("Dispersion Comparison with Linear Theory")
 plt.legend()
-plt.xlabel("k")
-plt.ylabel(r"$\omega$")
+plt.xlabel(r"$kv_0/\omega_p$")
+plt.ylabel(r"$|\omega|$")
+save_plot("dispersion_two_stream.pdf")
 plt.show()

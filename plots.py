@@ -171,9 +171,67 @@ def plot_initial_distribution(m: PicModel, hold=True):
         plt.show()  # Waits for user to close the plot
 
 
+def plot_snapshots_velocity(
+    m: PicModel,
+    snapshot_times: list = [],
+    hold: bool = True,
+    plot_title: str = "Time snapshots",
+):
+    print("Generating snapshots of f(v) at various time intervals.")
+    c = m.c
+    d = m.d
+    if not m.has_run:
+        m.run()
+    t_max = c.t_max
+    if not snapshot_times:
+        snapshot_times = [0, 0.25 * t_max, 0.5 * t_max, 0.75 * t_max, t_max]
+    dt = c.dt
+    t_steps = c.t_steps
+    N = c.N
+    L = c.L
+    subsample_ratio = c.subsample_ratio
+    x_hist = d.x_hist
+    v_hist = d.v_hist
+    snapshot_times.sort()
+    snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
+    snapshots = []
+    for frame in range(t_steps):
+        if frame in snapshot_frames:
+            snapshots.append(
+                {
+                    "x": x_hist[:, int(frame / subsample_ratio)],
+                    "v": v_hist[:, int(frame / subsample_ratio)],
+                    "frame": frame,
+                }
+            )
+    print(f"Sampled {len(snapshots)} snapshots over {t_steps} time steps.")
+    fig = plt.figure(figsize=(6, 8))
+    fig.suptitle(plot_title)
+    ax_fv = fig.add_subplot(111)
+    ax_fv.set_ylabel(r"$N f(v)$")
+    ax_fv.set_xlabel("v")
+    ax_fv.set_xlim(np.max(d.v_hist * L), np.min(d.v_hist * L))
+    for snapshot in snapshots:
+        cur_t = snapshot["frame"] * dt
+        ax_fv.hist(
+            snapshot["v"] * L,
+            bins=64,
+            fill=False,
+            # color="tab:orange",
+            histtype="step",
+            label=f"$t={cur_t:.2f}$",
+        )
+    ax_fv.legend()
+    plt.yscale("log")
+    plt.tight_layout()
+    save_plot(f"fv_hist_{N}_particles.pdf")
+    if hold:
+        plt.show()  # Waits for user to close the plots
+
+
 def plot_snapshots(
     m: PicModel,
-    snapshot_times: bool = None,
+    snapshot_times: list = [],
     hold: bool = True,
     plot_title: str = "Time snapshots",
 ):
@@ -283,6 +341,7 @@ def plot_traces(
     save_plot(f"traces_{N}_particles.pdf")
     if hold:
         plt.show()  # Waits for user to close the plots
+    return ax_energy
 
 
 def _init_animation(
@@ -315,6 +374,7 @@ def _animate_frame(
     # pt_ke,
     # pt_fe,
     # pt_te,
+    # ax_efield,
     pt_xv1,
     pt_xv2,
     pt_efield,
@@ -333,6 +393,9 @@ def _animate_frame(
         pt_xv2.set_data(
             (x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L)
         )
+    # ax_efield.set_ylim(
+    #     np.min(efield_hist[:, frame]), np.max(efield_hist[:, frame])
+    # )
     pt_efield.set_data((x_j * L) + x_min, efield_hist[:, frame])
     # pt_ke.set_data(time_axis, ke_hist)
     # pt_fe.set_data(time_axis, fe_hist)
@@ -432,6 +495,7 @@ def animate_phase_space(
         x_j=c.x_j,
         x_min=c.x_min,
         L=c.L,
+        # ax_efield=ax_efield,
         # time_axis=c.time_axis,
         # pt_ke=pt_ke,
         # pt_fe=pt_fe,

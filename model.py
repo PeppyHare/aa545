@@ -7,6 +7,7 @@ import numpy as np
 import progressbar
 
 # from scipy import stats
+from matplotlib import pyplot as plt
 
 from configuration import Configuration, ParticleData
 from weighting import weight_particles, weight_field
