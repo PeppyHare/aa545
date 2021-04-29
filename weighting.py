@@ -7,8 +7,53 @@ import numba
 import progressbar
 
 
-@numba.njit(boundscheck=True)
-def weight_particles(x, gp, dx, M, q=1, order=1):
+@numba.njit
+def weight_particles(x, gp, dx, M, q=1, order=0):
+    """Weight particles to grid. Assume x >= 0.
+
+    Weighting function order determined by value of :order:. Boundary is assumed
+    to be periodic such that j = mod(j, m).
+
+    :order: = 0: Nearest-grid-point weighting.
+
+    :order: = 1: Linear weighting. Particles are assigned to the two nearest
+    grid points via linear interpolation.
+    """
+    rho = np.zeros_like(gp)
+
+    # Nearest grid point
+    if order == 0:
+        for i in numba.prange(x.shape[0]):
+            j = round(x[i] / dx)
+            rho[j % M] += q / dx
+
+    # Linear weighting
+    elif order == 1:
+        for i in numba.prange(x.shape[0]):
+            assert x[i] >= 0
+            j = round(x[i] * M)  # 0 <= j <= m
+            if j > 0 and j / M > x[i]:
+                j = j - 1
+            # Apply periodic boundary conditions
+            if j == M:
+                rho[0] += q / dx
+            elif j == M - 1:
+                rho[j] += q * (gp[j] + dx - x[i]) / dx ** 2
+                rho[0] += q * (x[i] - gp[j]) / dx ** 2
+            else:
+                rho[j] += q * (gp[j + 1] - x[i]) / dx ** 2
+                rho[j + 1] += q * (x[i] - gp[j]) / dx ** 2
+            assert (
+                abs(np.sum(rho * dx) - q * (i + 1)) < 10 ** -6
+            )  # charge conservation
+    else:
+        raise ValueError("Incorrect value 'order', must be 0 or 1.")
+    assert abs(np.sum(rho * dx) - q * x.size) < 10 ** -6  # charge conservation
+    return rho
+
+
+@numba.njit
+def weight_particles_old(x, gp, dx, M, q=1, order=0):
     """Weight particles to grid. Assume x >= 0.
 
     Weighting function order determined by value of :order:. Boundary is assumed
@@ -40,14 +85,17 @@ def weight_particles(x, gp, dx, M, q=1, order=1):
             else:
                 rho[j] += q * (gp[j + 1] - x[i]) / dx ** 2
                 rho[j + 1] += q * (x[i] - gp[j]) / dx ** 2
+            assert (
+                abs(np.sum(rho * dx) - q * (i + 1)) < 10 ** -6
+            )  # charge conservation
     else:
         raise ValueError("Incorrect value 'order', must be 0 or 1.")
-    assert np.sum(rho[:-1] * dx) - x.size < 10 ** -6  # charge conservation
+    assert abs(np.sum(rho * dx) - q * x.size) < 10 ** -6  # charge conservation
     return rho
 
 
 @numba.njit
-def weight_field(x, gp, e_j, dx, order=1):
+def weight_field(x, gp, e_j, dx, order=0):
     """Obtain weighted field on particle from the grid.
 
     Weighting function order determined by value of :order:. Boundary is assumed

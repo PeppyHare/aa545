@@ -10,7 +10,6 @@ import time
 import numpy as np
 from scipy import stats
 from matplotlib import pyplot as plt
-from matplotlib.gridspec import GridSpec
 
 from configuration import Configuration
 from model import PicModel
@@ -19,29 +18,43 @@ from util import save_plot
 from weighting import weight_particles
 
 
-class TwoStreamConfiguration(Configuration):
-    N = 512
-    plot_grid_lines = False
-    n_periods = 20
-    wp = 1
-    perturbation = 0.001
-    beam_velocity = 0.2
-    dt = 0.01
-    max_history_steps = 1000
+# plt.style.use("dark_background")
 
-    def __init__(self, k, M):
+
+class TwoStreamConfiguration(Configuration):
+    plot_grid_lines = False
+    wp = 1
+    max_history_steps = 1000
+    markersize = 4
+
+    def __init__(
+        self,
+        k,
+        M,
+        N,
+        perturbation=0.001,
+        n_periods=12,
+        dt=0.01,
+        beam_velocity=0.2,
+    ):
+        self.M = M
+        self.N = N
+        self.k = k
+        self.dt = dt
         self.x_min = -np.pi
         self.x_max = np.pi
-        self.M = M
-        self.k = k
+        self.beam_velocity = beam_velocity
+        self.perturbation = perturbation
+        self.n_periods = n_periods
+        self.weighting_order = 1
         Configuration.__init__(self)
 
     def initialize_particles(self):
         v0 = self.beam_velocity
         dx = self.perturbation
-        beam1_x = np.linspace(self.x_min, self.x_max, int(self.N / 2 + 1))[:-1]
+        beam1_x = np.linspace(self.x_min, self.x_max, int(self.N / 2) + 1)[:-1]
         beam1_x += dx * np.sin(self.k * beam1_x)
-        beam2_x = np.linspace(self.x_min, self.x_max, int(self.N / 2 + 1))[:-1]
+        beam2_x = np.linspace(self.x_min, self.x_max, int(self.N / 2) + 1)[:-1]
         beam2_x -= dx * np.sin(self.k * beam2_x)
         beam1_v = v0 * np.ones_like(beam1_x)
         beam2_v = -v0 * np.ones_like(beam2_x)
@@ -49,13 +62,25 @@ class TwoStreamConfiguration(Configuration):
         self.initial_v = np.concatenate([beam1_v, beam2_v])
 
 
-def calc_growth_rate(k, M):
+def calc_growth_rate(
+    k,
+    M,
+    N,
+    ulim=0.0001,
+    llim=0.000001,
+    perturbation=0.001,
+    expects=[],
+    results=[],
+    k_trials=[],
+    n_periods=12,
+    dt=0.01,
+):
     """Growth rate of the two stream instability.
 
     Set up a PIC model for the given value k. Try to determine the exponential
     growth rate of the lowest unstable mode of the two-stream instability."""
 
-    c = TwoStreamConfiguration(k, M)
+    c = TwoStreamConfiguration(k, M, N, perturbation, n_periods, dt)
     m = PicModel(c)
     start = time.perf_counter()
     m.run()
@@ -93,6 +118,7 @@ def calc_growth_rate(k, M):
         )
         ** (1 / 2)
     )
+    # plots.plot_initial_distribution(m)
     # print(
     #     f"Possible w solutions:\n{sol1:.4f}\n{sol2:.4f}\n{sol3:.4f}\n{sol4:.4f}"
     # )
@@ -107,11 +133,11 @@ def calc_growth_rate(k, M):
     ramp_start = 0
     ramp_end = t_steps - 1
     for idx in range(t_steps):
-        if fe_hist[idx] / ke_hist[idx] > 0.00001:
+        if fe_hist[idx] / ke_hist[idx] > llim:
             ramp_start = idx
             break
     for idx in range(t_steps):
-        if fe_hist[idx] / ke_hist[idx] > 0.001:
+        if fe_hist[idx] / ke_hist[idx] > ulim:
             ramp_end = idx
             break
     dt = c.dt
@@ -133,17 +159,27 @@ def calc_growth_rate(k, M):
     # Let's see how much we can fit in one fig
     fig = plt.figure(figsize=(12, 8))
     fig.suptitle(f"k={k}, k*v0/wp={k*v0/c.wp:.2f}, M={M}, N={c.N}")
-    gs = GridSpec(2, 2, width_ratios=[1, 1], height_ratios=[1, 1])
-    ax_init = fig.add_subplot(gs[0])
+    ax_init = fig.add_subplot()
     ax_init.set_title("Initial perturbation")
-    ax_init.set_ylabel(r"$\rho")
+    ax_init.set_ylabel(r"$\rho$")
     ax_init.set_xlabel("x")
-    beam1_x = c.initial_x[: int(c.N / 2)]
-    beam2_x = c.initial_x[int(c.N / 2) :]
+    halfway = int(c.N / 2)
+    beam1_x = (c.initial_x[:halfway] - c.x_min) / c.L
+    beam2_x = (c.initial_x[halfway:] - c.x_min) / c.L
     x_j = c.x_j
     x_j_unorm = (c.x_j * c.L) + c.x_min
-    rho1 = weight_particles(beam1_x, x_j, c.dx, c.M, q=1, order=1)
-    rho2 = weight_particles(beam2_x, x_j, c.dx, c.M, q=-1, order=1)
+    rho1 = (
+        weight_particles(
+            beam1_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
+        )
+        - c.rho_bg / 2
+    )
+    rho2 = (
+        weight_particles(
+            beam2_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
+        )
+        - c.rho_bg / 2
+    )
     ax_init.plot(
         x_j_unorm,
         rho1,
@@ -160,10 +196,20 @@ def calc_growth_rate(k, M):
         markersize=c.markersize,
         label="xv",
     )
+    ax_init.set_xlim(c.x_min, c.x_max)
+    for grid_pt in x_j_unorm:
+        ax_init.axvline(
+            grid_pt,
+            linestyle="--",
+            color="k",
+            linewidth=0.1,
+        )
+    save_plot(f"two_stream_initial_density_k={k}.pdf")
+    plt.show()
 
-    ax_energy = fig.add_subplot(gs[1])
-    plots._plot_energy_ax(m, ax_energy)
-    plt.tight_layout()
+    # ax_energy = fig.add_subplot(gs[1])
+    # plots._plot_energy_ax(m, ax_energy)
+    # plt.tight_layout()
     # plots.plot_initial_distribution(m)
 
     # plots.plot_traces(
@@ -171,42 +217,92 @@ def calc_growth_rate(k, M):
     #     max_traces=30,
     #     start_at_frame=int(ramp_start / c.subsample_ratio),
     #     plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
-    #     hold=False
+    #     hold=False,
+    # # )
+    # snapshots_title = (
+    #     f"Snapshots: $k={k}, L={c.x_max - c.x_min:.2f},"
+    #     f" kv_0/\omega_p={k*v0/wp:.2f}$"
     # )
     # plots.plot_snapshots(
     #     m,
-    #     hold=False,
-    #     plot_title=(
-    #         f"Snapshots: k={k}, L={c.x_max - c.x_min:.2f},"
-    #         f" k*v0/wp={k*v0/wp:.2f}"
-    #     ),
-    # )
-    # plots.plot_energy_history(m, hold=False)
-    # plots.animate_phase_space(
-    #     m,
-    #     plot_title=(
-    #         f"Phase space animation k: {k}, k*v0/wp: {k*v0/wp:.2f}, dx:"
-    #         f" {c.perturbation}"
-    #     ),
-    #     repeat=True,
     #     hold=True,
+    #     plot_title=(snapshots_title),
     # )
-    plt.show()
+    energy_title = (
+        f"Total Energy over Time: $k={k}, L={c.x_max - c.x_min:.2f},"
+        f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    )
+    ax_energy = plots.plot_energy_history(
+        m, hold=False, plot_title=energy_title
+    )
+    ax_energy.plot(
+        time_axis,
+        np.exp(lr.slope * time_axis + lr.intercept),
+        "r--",
+        linewidth=0.5,
+        label="fit",
+    )
+    ax_energy.set_ylim(min(d.fe_hist), 10 * max(d.fe_hist + d.ke_hist))
+    plt.figure()
+    plt.plot(time_axis, d.fe_hist / d.ke_hist)
+    plt.yscale("log")
 
+    plots.animate_phase_space(
+        m,
+        plot_title=(
+            f"Phase space animation k: {k}, k*v0/wp: {k*v0/wp:.2f}, dx:"
+            f" {c.perturbation}"
+        ),
+        repeat=True,
+        hold=True,
+    )
+    plt.show()
+    expects.append(expected_rate)
+    results.append(lr.slope / 2)
+    k_trials.append(k)
     return (expected_rate, lr.slope / 2)
 
 
-k_trials = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-m_trials = [512, 512, 512, 512, 512, 512, 512, 512, 512, 512]
-n_trials = len(k_trials)
-expects = np.zeros(n_trials)
-results = np.zeros(n_trials)
-inputs = np.zeros(n_trials)
+k_trials = []
+expects = []
+results = []
 
-for idx, k in enumerate(k_trials):
-    (expect, result) = calc_growth_rate(k, M=m_trials[idx])
-    expects[idx] = expect
-    results[idx] = result
+# calc_growth_rate(  # Final keep this!
+#     k=1,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -4,
+#     llim=10 ** -6,
+#     perturbation=0.001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+# )
+# calc_growth_rate(
+#     k=2,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+# )
+calc_growth_rate(
+    k=1,
+    M=128,
+    N=256,
+    ulim=10 ** -1,
+    llim=10 ** -3,
+    perturbation=0.0001,
+    expects=expects,
+    results=results,
+    k_trials=k_trials,
+    n_periods=10,
+    dt=0.05,
+)
+
 
 fig = plt.figure()
 plt.plot(k_trials, expects, "-o", color="cyan", label="expected")

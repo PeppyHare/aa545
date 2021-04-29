@@ -56,6 +56,7 @@ class PicModel:
         p_hist,
         x_hist,
         v_hist,
+        efield_hist,
         subsample_ratio,
         M,
         dx,
@@ -96,6 +97,8 @@ class PicModel:
 
         # Solve Poisson's equation
         e_j = compute_field(rho, inv_a, dx)
+        for j in range(M):
+            efield_hist[j, int(frame / subsample_ratio)] = e_j[j]
 
         # Calculate total electric field energy
         fe_hist[frame] += dx / 2 * eps0 * np.sum(e_j * e_j)
@@ -138,7 +141,7 @@ class PicModel:
                 x_hist[i][int(frame / subsample_ratio)] += x_i[i]
                 v_hist[i][int(frame / subsample_ratio)] += v_i[i]
 
-    def run(self, showprogress=True, debugprint=False):
+    def run(self, showprogress=True):
         """Run the simulation."""
         c = self.c
         d = self.d
@@ -153,18 +156,6 @@ class PicModel:
                 ],
             )
             bar.start()
-        if debugprint:
-            print("Running with the following params:")
-            print(f"t_max: {c.t_max}")
-            print(f"t_steps: {c.t_steps}")
-            print(f"dt: {c.dt}")
-            print(f"N: {c.N}")
-            print(f"M: {c.M}")
-            print(f"dx: {c.dx}")
-            print(f"wp: {c.wp}")
-            print(f"q: {c.q}")
-            print(f"m: {c.m}")
-            print(f"rho_bg: {c.rho_bg}")
         for frame in range(c.t_steps):
             self.time_step(
                 frame,
@@ -176,6 +167,7 @@ class PicModel:
                 p_hist=d.p_hist,
                 x_hist=d.x_hist,
                 v_hist=d.v_hist,
+                efield_hist=d.efield_hist,
                 subsample_ratio=c.subsample_ratio,
                 M=c.M,
                 dx=c.dx,

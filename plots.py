@@ -25,18 +25,26 @@ def _plot_energy_ax(m: PicModel, ax_energy):
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
     ax_energy.set_yscale("log")
-    (pt_te,) = ax_energy.plot(time_axis, ke_hist + fe_hist, "k-", markersize=1, label="total")
-    (pt_ke,) = ax_energy.plot(time_axis, ke_hist, "b-", markersize=1, label="ke")
-    (pt_fe,) = ax_energy.plot(time_axis, fe_hist, "g-", markersize=1, label="fe")
+    (pt_te,) = ax_energy.plot(
+        time_axis, ke_hist + fe_hist, "r-", markersize=1, label="total"
+    )
+    (pt_ke,) = ax_energy.plot(
+        time_axis, ke_hist, "b-", markersize=1, label="ke"
+    )
+    (pt_fe,) = ax_energy.plot(
+        time_axis, fe_hist, "g-", markersize=1, label="fe"
+    )
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
         [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
-        loc="upper right",
+        loc="lower right",
     )
     return ax_energy
 
 
-def plot_energy_history(m: PicModel, plot_title="Time evolution of energy", hold=True):
+def plot_energy_history(
+    m: PicModel, plot_title="Time evolution of energy", hold=True
+):
     """Generate log-log plot of the total kinetic and field energy history."""
     print("Generating plots of the total energy history.")
     fig = plt.figure(figsize=(12, 6))
@@ -45,11 +53,18 @@ def plot_energy_history(m: PicModel, plot_title="Time evolution of energy", hold
     _plot_energy_ax(m, ax_energy)
     plt.tight_layout()
     now_seconds = (
-        datetime.datetime.now() - datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        datetime.datetime.now()
+        - datetime.datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
     ).total_seconds()
-    save_plot(f"energy_instability_growth_{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}.pdf")
+    save_plot(
+        f"energy_instability_growth_{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}.pdf"
+    )
     if hold:
         plt.show()  # Waits for user to close the plots
+    else:
+        return ax_energy
 
 
 def plot_initial_distribution(m: PicModel, hold=True):
@@ -196,17 +211,27 @@ def plot_snapshots(
     fig.suptitle(plot_title)
     num_subplots = len(snapshots)
     idx = 1
+    n2 = math.ceil(c.N / 2)
     for snapshot in snapshots:
         ax_xv = fig.add_subplot(num_subplots, 1, idx)
         cur_t = snapshot["frame"] * dt
         ax_xv.set_ylabel("v")
         ax_xv.set_title(f"t={cur_t:.2f}")
         plt.plot(
-            (snapshot["x"] * L) + x_min,
-            (snapshot["v"] * L),
-            "ko",
+            (snapshot["x"][:n2] * L) + x_min,
+            (snapshot["v"][:n2] * L),
+            ".",
+            color="tab:orange",
             markersize=1,
         )
+        plt.plot(
+            (snapshot["x"][n2:] * L) + x_min,
+            (snapshot["v"][n2:] * L),
+            ".",
+            color="tab:cyan",
+            markersize=1,
+        )
+
         plt.xlim(x_range)
         if idx == num_subplots:
             ax_xv.set_xlabel("x")
@@ -268,17 +293,20 @@ def _init_animation(
     ax_xv,
     pt_xv1,
     pt_xv2,
+    pt_efield,
 ):
     ax_xv.set_xlim(x_range)
     ax_xv.set_ylim(v_min, v_max)
     # return (pt_xv1, pt_xv2, pt_ke, pt_fe, pt_te)
-    return (pt_xv1, pt_xv2)
+    return (pt_xv1, pt_xv2, pt_efield)
 
 
 def _animate_frame(
     frame,
     x_hist,
     v_hist,
+    efield_hist,
+    x_j,
     # ke_hist,
     # fe_hist,
     x_min,
@@ -289,6 +317,7 @@ def _animate_frame(
     # pt_te,
     pt_xv1,
     pt_xv2,
+    pt_efield,
     time_text,
     vline_t,
     subsample_ratio,
@@ -301,12 +330,15 @@ def _animate_frame(
     n2 = math.ceil(N / 2)
     pt_xv1.set_data((x_hist[:n2, frame] * L) + x_min, (v_hist[:n2, frame] * L))
     if n2 > 0:
-        pt_xv2.set_data((x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L))
+        pt_xv2.set_data(
+            (x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L)
+        )
+    pt_efield.set_data((x_j * L) + x_min, efield_hist[:, frame])
     # pt_ke.set_data(time_axis, ke_hist)
     # pt_fe.set_data(time_axis, fe_hist)
     # pt_te.set_data(time_axis, fe_hist + ke_hist)
     # return (pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te)
-    return (pt_xv1, pt_xv2, time_text, vline_t)
+    return (pt_xv1, pt_xv2, time_text, vline_t, pt_efield)
 
 
 def animate_phase_space(
@@ -337,7 +369,8 @@ def animate_phase_space(
     fig = plt.figure(figsize=(12, 8))
     fig.suptitle(plot_title)
     ax_xv = plt.subplot2grid((2, 2), (0, 0), colspan=2, rowspan=1)
-    ax_energy = plt.subplot2grid((2, 2), (1, 0), colspan=2, rowspan=1)
+    ax_energy = plt.subplot2grid((2, 2), (1, 0), colspan=1, rowspan=1)
+    ax_efield = plt.subplot2grid((2, 2), (1, 1), colspan=1, rowspan=1)
 
     ax_xv.set_title("Phase space animation")
     ax_xv.set_ylabel("v")
@@ -346,14 +379,13 @@ def animate_phase_space(
     ax_xv.set_ylim(v_range)
 
     _plot_energy_ax(m, ax_energy)
-    vline_t = ax_energy.axvline(0, ls="--", color="k", zorder=10)
+    vline_t = ax_energy.axvline(0, ls="--", color="darkgray", zorder=10)
 
-    # ax_energy.set_title("Energy")
-    # ax_energy.set_xlim(0, t_max)
-    # ax_energy.set_ylim(0, 1.2 * np.max(d.fe_hist + d.ke_hist))
-    # ax_energy.set_ylabel("energy")
-    # ax_energy.set_xlabel("time")
-    # ax_energy.set_yscale("log")
+    ax_efield.set_title("Electric field")
+    ax_efield.set_ylabel(r"$E$")
+    ax_efield.set_xlabel(r"$x$")
+    ax_efield.set_xlim(x_range)
+    ax_efield.set_ylim(np.min(d.efield_hist), np.max(d.efield_hist))
 
     (pt_xv1,) = ax_xv.plot(
         [],
@@ -371,6 +403,8 @@ def animate_phase_space(
         markersize=markersize,
         label="xv",
     )
+
+    (pt_efield,) = ax_efield.plot([], [], "-", color="tab:green", label="E")
     # (pt_ke,) = ax_energy.plot(
     #     c.time_axis, d.ke_hist, "b-", markersize=1, label="ke"
     # )
@@ -392,8 +426,10 @@ def animate_phase_space(
         _animate_frame,
         x_hist=d.x_hist,
         v_hist=d.v_hist,
+        efield_hist=d.efield_hist,
         # ke_hist=d.ke_hist,
         # fe_hist=d.fe_hist,
+        x_j=c.x_j,
         x_min=c.x_min,
         L=c.L,
         # time_axis=c.time_axis,
@@ -402,6 +438,7 @@ def animate_phase_space(
         # pt_te=pt_te,
         pt_xv1=pt_xv1,
         pt_xv2=pt_xv2,
+        pt_efield=pt_efield,
         time_text=time_text,
         vline_t=vline_t,
         subsample_ratio=c.subsample_ratio,
@@ -415,6 +452,7 @@ def animate_phase_space(
         ax_xv=ax_xv,
         pt_xv1=pt_xv1,
         pt_xv2=pt_xv2,
+        pt_efield=pt_efield,
         # pt_ke=pt_ke,
         # pt_fe=pt_fe,
         # pt_te=pt_te,
@@ -435,7 +473,10 @@ def animate_phase_space(
     else:
         create_folder(os.path.join(os.getcwd(), "plots", "pic1"))
         now_seconds = (
-            datetime.datetime.now() - datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            datetime.datetime.now()
+            - datetime.datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
         ).total_seconds()
         animation_name = os.path.join(
             "plots",

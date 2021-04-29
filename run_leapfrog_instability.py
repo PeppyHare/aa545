@@ -46,6 +46,7 @@ plots.plot_initial_distribution(m)
 m.run()
 # Get the data from the run
 d = m.d
+plots.animate_phase_space(m, plot_title="Leapfrog Instability demo")
 print(f"dt: {c.dt:.2f}")
 print(f"wp: {c.wp:.2f}")
 

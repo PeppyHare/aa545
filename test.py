@@ -1,40 +1,32 @@
-class Configuration:
-    a = 1
-    b = 2
-    x = None
 
-    def __init__(self):
-        self.set_x()
+import time
 
-    def set_x(self):
-        self.x = 20
+import numpy as np
+from scipy import stats
+from matplotlib import pyplot as plt
 
-    def print_a(self):
-        print(self.a)
-
-
-class BetterConfiguration(Configuration):
-    b = 30
-
-    def set_x(self):
-        self.x = -2
+from configuration import Configuration
+from model import PicModel
+import plots
+from util import save_plot
+from weighting import weight_particles
 
 
-class Model:
-    def __init__(self, c: Configuration):
-        self.ab = c.b - c.a
-        self.c = c
+class TestConfiguration(Configuration):
+    plot_grid_lines = True
+    wp = 1
+    max_history_steps = 1000
+    markersize = 4
 
-    def get_x(self):
-        c: Configuration = self.c
-        return c.x
-
-
-m = Model(BetterConfiguration())
-print(m.ab)
-print(m.get_x())
-print("hooray")
-m2 = Model(Configuration())
-print(m2.get_x())
-c = Configuration()
-c.print_a()
+    def initialize_particles(self):
+        initial_x = np.linspace(self.x_min, self.x_max)
+        v0 = self.beam_velocity
+        dx = self.perturbation
+        beam1_x = np.linspace(self.x_min, self.x_max, int(self.N / 2) + 1)[:-1]
+        beam1_x += dx * np.sin(self.k * beam1_x)
+        beam2_x = np.linspace(self.x_min, self.x_max, int(self.N / 2) + 1)[:-1]
+        beam2_x -= dx * np.sin(self.k * beam2_x)
+        beam1_v = v0 * np.ones_like(beam1_x)
+        beam2_v = -v0 * np.ones_like(beam2_x)
+        self.initial_x = np.concatenate([beam1_x, beam2_x])
+        self.initial_v = np.concatenate([beam1_v, beam2_v])

@@ -132,3 +132,5 @@ class ParticleData:
         self.x_hist = np.zeros((c.N, c.history_steps + 3))
         # Subsampled history of particle velocities
         self.v_hist = np.zeros((c.N, c.history_steps + 3))
+        # Subsampled history of electric field
+        self.efield_hist = np.zeros((c.M, c.history_steps + 3))
