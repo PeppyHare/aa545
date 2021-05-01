@@ -37,9 +37,9 @@ def test_solve_poisson():
     phi = (2πk/L)^-2 * sin(2πkx/L)
     """
 
-    for m in [2 ** (2 * x + 1) for x in range(1, 6)]:
+    for m in [2 ** (2 * x + 1) for x in range(2, 6)]:
         for k in [1, 2, 4, 16]:
-            L = 2 * np.pi
+            L = 1
             dx = L / m
             (inv_a, _) = setup_poisson(m)
             grid_pts = np.linspace(0, L, m + 1)[:-1]

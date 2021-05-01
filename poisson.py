@@ -67,6 +67,22 @@ def setup_poisson2(m):
 
 
 @numba.njit
+def solve_poisson_fft(rho, inv_a, dx):
+    """Solve Poisson's equation using FFT."""
+    m = rho.shape[0]
+    with numba.objmode(phi_j="float64[:]"):
+        rho_fft = np.fft.fft(rho)
+        kx = np.fft.fftfreq(m) * m
+        kx[0] = 1
+        phi_fft = (
+            -0.5 * rho_fft / ((np.cos(2.0 * np.pi * kx / (m)) - 1.0) * m ** 2)
+        )
+        phi_fft[0] = 0
+        phi_j = np.real(np.fft.ifft(phi_fft))
+    return phi_j
+
+
+@numba.njit
 def solve_poisson(rho, inv_a, dx):
     """Calculate electric field on the grid.
 
@@ -122,28 +138,28 @@ def compute_field2(rho, inv_a, dx):
 
 
 if __name__ == "__main__":
-    print("#" * 80)
-    print("Testing solution of uniform charge distribution")
-    print("#" * 80)
-    m = 33
-    n = 4
-    x = np.linspace(0.0, 1.0, n)
-    grid_pts = np.linspace(0, 1, m + 1)[:-1]
-    dx = 1 / (m - 1)
-    rho = weight_particles(x, grid_pts, dx, m, order=1)
-    (inv_a, _) = setup_poisson(m)
-    print(inv_a)
-    e_j = compute_field(rho, inv_a, dx)
-    print(e_j)
+    # print("#" * 80)
+    # print("Testing solution of uniform charge distribution")
+    # print("#" * 80)
+    # m = 32
+    # n = 4
+    # x = np.linspace(0.0, 1.0, n)
+    # grid_pts = np.linspace(0, 1, m + 1)[:-1]
+    # dx = 1 / m
+    # rho = weight_particles(x, grid_pts, dx, m, order=1)
+    # (inv_a, _) = setup_poisson(m)
+    # print(inv_a)
+    # e_j = compute_field(rho, inv_a, dx)
+    # print(e_j)
 
     print("#" * 80)
     print("Testing performance of solve_poisson()")
     print("#" * 80)
     m = 32
     n = 4098
-    t_steps = 10000
-    grid_pts = np.linspace(0, 1, m)
-    dx = 1 / (m - 1)
+    t_steps = 100
+    grid_pts = np.linspace(0, 1, m + 1)[:-1]
+    dx = 1 / m
     x = np.random.uniform(0.0, 1.0, n)
     # Run one short iteration to compile compute_field()
     rho = weight_particles(x, grid_pts, dx, m, order=1)

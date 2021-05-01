@@ -8,7 +8,7 @@ import progressbar
 
 
 @numba.njit
-def weight_particles2(x, gp, dx, M, q=1, order=0):
+def weight_particles(x, gp, dx, M, q=1, order=0):
     """Weight particles to grid. Assume x >= 0.
 
     Weighting function order determined by value of :order:. Boundary is assumed
@@ -30,7 +30,7 @@ def weight_particles2(x, gp, dx, M, q=1, order=0):
     # Linear weighting
     elif order == 1:
         for i in numba.prange(x.shape[0]):
-            assert x[i] >= 0 and x[i] < 1
+            assert x[i] >= 0 and x[i] <= 1
             j = round(x[i] * M)  # 0 <= j <= m
             if (j > 0) and (j > M * x[i]):
                 j = j - 1
@@ -54,7 +54,7 @@ def weight_particles2(x, gp, dx, M, q=1, order=0):
 
 
 @numba.njit
-def weight_particles(x, gp, dx, M, q=1, order=0):
+def weight_particles_new(x, gp, dx, M, q=1, order=0):
     """Weight particles to grid. Assume x >= 0.
 
     Weighting function order determined by value of :order:. Boundary is assumed

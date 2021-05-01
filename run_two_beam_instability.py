@@ -123,46 +123,46 @@ def calc_growth_rate(
     # )
 
     # Plot the initial density displacement for each beam
-    fig = plt.figure(figsize=(12, 8))
-    fig.suptitle(f"k={k}, k*v0/wp={k*v0/c.wp:.2f}, M={M}, N={c.N}")
-    ax_init = fig.add_subplot()
-    ax_init.set_title("Initial perturbation")
-    ax_init.set_ylabel(r"$\rho$")
-    ax_init.set_xlabel("x")
-    halfway = int(c.N / 2)
-    beam1_x = (c.initial_x[:halfway] - c.x_min) / c.L
-    beam2_x = (c.initial_x[halfway:] - c.x_min) / c.L
-    x_j = c.x_j
-    x_j_unorm = (c.x_j * c.L) + c.x_min
-    rho1 = (
-        weight_particles(
-            beam1_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
-        )
-        - c.rho_bg / 2
-    )
-    rho2 = (
-        weight_particles(
-            beam2_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
-        )
-        - c.rho_bg / 2
-    )
-    ax_init.plot(
-        x_j_unorm,
-        rho1 - np.average(rho1),
-        ".",
-        color="tab:orange",
-        markersize=c.markersize,
-        label="xv",
-    )
-    ax_init.plot(
-        x_j_unorm,
-        rho2 - np.average(rho2),
-        ".",
-        color="tab:cyan",
-        markersize=c.markersize,
-        label="xv",
-    )
-    ax_init.set_xlim(c.x_min, c.x_max)
+    # fig = plt.figure(figsize=(12, 8))
+    # fig.suptitle(f"k={k}, k*v0/wp={k*v0/c.wp:.2f}, M={M}, N={c.N}")
+    # ax_init = fig.add_subplot()
+    # ax_init.set_title("Initial perturbation")
+    # ax_init.set_ylabel(r"$\rho$")
+    # ax_init.set_xlabel("x")
+    # halfway = int(c.N / 2)
+    # beam1_x = (c.initial_x[:halfway] - c.x_min) / c.L
+    # beam2_x = (c.initial_x[halfway:] - c.x_min) / c.L
+    # x_j = c.x_j
+    # x_j_unorm = (c.x_j * c.L) + c.x_min
+    # rho1 = (
+    #     weight_particles(
+    #         beam1_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
+    #     )
+    #     - c.rho_bg / 2
+    # )
+    # rho2 = (
+    #     weight_particles(
+    #         beam2_x, x_j, c.dx, c.M, q=c.q, order=c.weighting_order
+    #     )
+    #     - c.rho_bg / 2
+    # )
+    # ax_init.plot(
+    #     x_j_unorm,
+    #     rho1 - np.average(rho1),
+    #     ".",
+    #     color="tab:orange",
+    #     markersize=c.markersize,
+    #     label="xv",
+    # )
+    # ax_init.plot(
+    #     x_j_unorm,
+    #     rho2 - np.average(rho2),
+    #     ".",
+    #     color="tab:cyan",
+    #     markersize=c.markersize,
+    #     label="xv",
+    # )
+    # ax_init.set_xlim(c.x_min, c.x_max)
     # for grid_pt in x_j_unorm:
     #     ax_init.axvline(
     #         grid_pt,
@@ -213,51 +213,51 @@ def calc_growth_rate(
     # plt.tight_layout()
     # plots.plot_initial_distribution(m)
 
-    ax_energy = plots.plot_traces(
-        m,
-        max_traces=25,
-        start_at_frame=int(ramp_start / c.subsample_ratio),
-        plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
-        hold=False,
-    )
-    ax_energy.plot(
-        time_axis,
-        np.exp(lr.slope * time_axis + lr.intercept),
-        "r--",
-        linewidth=0.5,
-        label="fit",
-    )
-    ax_energy.set_ylim(min(d.fe_hist), 10 * max(d.fe_hist + d.ke_hist))
-    save_plot(f"two-stream-traces-k={k}.pdf")
-    snapshots_title = (
-        f"Snapshots: $k={k}, L={c.x_max - c.x_min:.2f},"
-        f" kv_0/\omega_p={k*v0/wp:.2f}$"
-    )
-    plots.plot_snapshots(
-        m,
-        hold=True,
-        plot_title=(snapshots_title),
-    )
-    velocity_snapshots_title = (
-        f"Evolution of $f(v)$: $k={k}, L={c.x_max - c.x_min:.2f},"
-        f" kv_0/\omega_p={k*v0/wp:.2f}$"
-    )
-    plots.plot_snapshots_velocity(
-        m,
-        hold=True,
-        plot_title=(velocity_snapshots_title),
-    )
-    energy_title = (
-        f"Total Energy over Time: $k={k}, L={c.x_max - c.x_min:.2f},"
-        f" kv_0/\omega_p={k*v0/wp:.2f}$"
-    )
-    ax_energy = plots.plot_energy_history(
-        m, hold=False, plot_title=energy_title
-    )
+    # ax_energy = plots.plot_traces(
+    #     m,
+    #     max_traces=25,
+    #     start_at_frame=int(ramp_start / c.subsample_ratio),
+    #     plot_title=f"Plot traces k={k}, k*v0/wp={k*v0/wp:.2f}",
+    #     hold=False,
+    # )
+    # ax_energy.plot(
+    #     time_axis,
+    #     np.exp(lr.slope * time_axis + lr.intercept),
+    #     "r--",
+    #     linewidth=0.5,
+    #     label="fit",
+    # )
+    # ax_energy.set_ylim(min(d.fe_hist), 10 * max(d.fe_hist + d.ke_hist))
+    # save_plot(f"two-stream-traces-k={k}.pdf")
+    # snapshots_title = (
+    #     f"Snapshots: $k={k}, L={c.x_max - c.x_min:.2f},"
+    #     f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    # )
+    # plots.plot_snapshots(
+    #     m,
+    #     hold=True,
+    #     plot_title=(snapshots_title),
+    # )
+    # velocity_snapshots_title = (
+    #     f"Evolution of $f(v)$: $k={k}, L={c.x_max - c.x_min:.2f},"
+    #     f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    # )
+    # plots.plot_snapshots_velocity(
+    #     m,
+    #     hold=True,
+    #     plot_title=(velocity_snapshots_title),
+    # )
+    # energy_title = (
+    #     f"Total Energy over Time: $k={k}, L={c.x_max - c.x_min:.2f},"
+    #     f" kv_0/\omega_p={k*v0/wp:.2f}$"
+    # )
+    # ax_energy = plots.plot_energy_history(
+    #     m, hold=False, plot_title=energy_title
+    # )
 
-    plt.figure()
-    plt.plot(time_axis, d.fe_hist / d.ke_hist)
-    plt.yscale("log")
+    # plt.figure()
+    # plt.plot(time_axis, d.fe_hist / d.ke_hist)
+    # plt.yscale("log")
 
     plots.animate_phase_space(
         m,
@@ -268,7 +268,7 @@ def calc_growth_rate(
         repeat=True,
         hold=True,
     )
-    plt.show()
+    # plt.show()
     expects.append(expected_rate)
     results.append(lr.slope / 2)
     k_trials.append(k)
@@ -282,7 +282,7 @@ results = []
 calc_growth_rate(
     k=1,
     M=512,
-    N=1024,
+    N=4096,
     ulim=10 ** -4,
     llim=10 ** -6,
     perturbation=0.0001,
@@ -290,95 +290,95 @@ calc_growth_rate(
     results=results,
     k_trials=k_trials,
 )
-calc_growth_rate(
-    k=2,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-)
-calc_growth_rate(
-    k=3,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.0001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-    n_periods=10,
-    dt=0.05,
-)
-calc_growth_rate(
-    k=4,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.0001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-    n_periods=10,
-    dt=0.05,
-)
-calc_growth_rate(
-    k=5,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.0001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-    n_periods=10,
-    dt=0.05,
-)
-calc_growth_rate(
-    k=6,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.0001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-    n_periods=10,
-    dt=0.05,
-)
-calc_growth_rate(
-    k=7,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.0001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-    n_periods=10,
-    dt=0.05,
-)
-calc_growth_rate(
-    k=8,
-    M=512,
-    N=1024,
-    ulim=10 ** -1,
-    llim=10 ** -3,
-    perturbation=0.0001,
-    expects=expects,
-    results=results,
-    k_trials=k_trials,
-    n_periods=10,
-    dt=0.05,
-)
+# calc_growth_rate(
+#     k=2,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+# )
+# calc_growth_rate(
+#     k=3,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.0001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+#     n_periods=10,
+#     dt=0.05,
+# )
+# calc_growth_rate(
+#     k=4,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.0001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+#     n_periods=10,
+#     dt=0.05,
+# )
+# calc_growth_rate(
+#     k=5,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.0001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+#     n_periods=10,
+#     dt=0.05,
+# )
+# calc_growth_rate(
+#     k=6,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.0001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+#     n_periods=10,
+#     dt=0.05,
+# )
+# calc_growth_rate(
+#     k=7,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.0001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+#     n_periods=10,
+#     dt=0.05,
+# )
+# calc_growth_rate(
+#     k=8,
+#     M=512,
+#     N=1024,
+#     ulim=10 ** -1,
+#     llim=10 ** -3,
+#     perturbation=0.0001,
+#     expects=expects,
+#     results=results,
+#     k_trials=k_trials,
+#     n_periods=10,
+#     dt=0.05,
+# )
 
 
 fig = plt.figure()
