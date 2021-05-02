@@ -531,7 +531,7 @@ def animate_phase_space(
         frames=range(d.x_hist.shape[1]),
         init_func=init_animation,
         blit=True,
-        interval=4,
+        interval=3,
         repeat=repeat,
     )
     plt.tight_layout()

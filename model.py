@@ -149,7 +149,10 @@ class PicModel:
         (vx_ip, vy_ip) = rotate_xy(vx_i + dv / 2, vy_i, -wc * dt)
 
         # Compute kinetic energy, momentum
-        ke_hist[frame] += m / 2 * np.sum(np.abs(vx_i * vx_ip))
+        # KE = 0.5 * m * (v_x(t-1/2)*v_x(t+1/2) + v_y(t-1/2)*v_y(t+1/2))
+        ke_hist[frame] += (
+            m / 2 * np.sum(np.abs(vx_i * vx_ip) + np.abs(vy_i * vy_ip))
+        )
         p_hist[frame] += m * np.sum((vx_i + vx_ip) / 2)
         vx_i += vx_ip - vx_i
         vy_i += vy_ip - vy_i
