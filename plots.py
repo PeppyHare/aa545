@@ -13,6 +13,9 @@ from util import save_plot, create_folder
 from weighting import weight_particles
 
 
+plt.style.use("dark_background")
+
+
 def _plot_energy_ax(m: PicModel, ax_energy):
     c = m.c
     d = m.d
@@ -78,8 +81,7 @@ def plot_initial_distribution(m: PicModel, hold=True):
     # Get the un-normalized and normalized particle positions and velocities
     x_i_unorm = c.initial_x
     x_i = (x_i_unorm - c.x_min) / c.L
-    v_i_unorm = c.initial_v
-    # v_i = v_i_unorm / c.L
+    vx_i_unorm = c.initial_vx
     x_j = c.x_j
     x_j_unorm = (c.x_j * c.L) + c.x_min
 
@@ -121,8 +123,8 @@ def plot_initial_distribution(m: PicModel, hold=True):
 
     # Plot initial velocity histogram
     ax_init_velocity = fig1.add_subplot(2, 2, 2)
-    bins = math.ceil((c.v_range[1] - c.v_range[0]) / bin_width)
-    ax_init_velocity.hist(v_i_unorm, bins=bins, range=c.v_range)
+    bins = math.ceil((c.vx_range[1] - c.vx_range[0]) / bin_width)
+    ax_init_velocity.hist(vx_i_unorm, bins=bins, range=c.vx_range)
     ax_init_velocity.set_xlabel(r"$v$")
     plt.xlim(c.x_range)
     plt.title("Velocity")
@@ -133,7 +135,7 @@ def plot_initial_distribution(m: PicModel, hold=True):
     n2 = math.ceil(c.N / 2)
     ax_init_phase.plot(
         x_i_unorm[:n2],
-        v_i_unorm[:n2],
+        vx_i_unorm[:n2],
         ".",
         color="tab:orange",
         markersize=c.markersize,
@@ -141,7 +143,7 @@ def plot_initial_distribution(m: PicModel, hold=True):
     )
     ax_init_phase.plot(
         x_i_unorm[n2:],
-        v_i_unorm[n2:],
+        vx_i_unorm[n2:],
         ".",
         color="tab:cyan",
         markersize=c.markersize,
@@ -191,7 +193,7 @@ def plot_snapshots_velocity(
     L = c.L
     subsample_ratio = c.subsample_ratio
     x_hist = d.x_hist
-    v_hist = d.v_hist
+    v_hist = d.vx_hist
     snapshot_times.sort()
     snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
     snapshots = []
@@ -210,7 +212,7 @@ def plot_snapshots_velocity(
     ax_fv = fig.add_subplot(111)
     ax_fv.set_ylabel(r"$N f(v)$")
     ax_fv.set_xlabel("v")
-    ax_fv.set_xlim(np.max(d.v_hist * L), np.min(d.v_hist * L))
+    ax_fv.set_xlim(np.max(d.vx_hist * L), np.min(d.vx_hist * L))
     for snapshot in snapshots:
         cur_t = snapshot["frame"] * dt
         ax_fv.hist(
@@ -234,6 +236,7 @@ def plot_snapshots(
     snapshot_times: list = [],
     hold: bool = True,
     plot_title: str = "Time snapshots",
+    filename: str = "snapshots.pdf",
 ):
     print("Generating snapshots of state at various time intervals.")
     c = m.c
@@ -251,7 +254,7 @@ def plot_snapshots(
     x_range = c.x_range
     subsample_ratio = c.subsample_ratio
     x_hist = d.x_hist
-    v_hist = d.v_hist
+    v_hist = d.vx_hist
     snapshot_times.sort()
     snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
     snapshots = []
@@ -295,7 +298,7 @@ def plot_snapshots(
             ax_xv.set_xlabel("x")
         idx += 1
     plt.tight_layout()
-    save_plot(f"snapshots_{N}_particles.pdf")
+    save_plot(filename)
     if hold:
         plt.show()  # Waits for user to close the plots
 
@@ -321,7 +324,7 @@ def plot_traces(
         m.run()
     N = c.N
     x_hist = d.x_hist
-    v_hist = d.v_hist
+    v_hist = d.vx_hist
     x_range = c.x_range
     L = c.L
     x_min = c.x_min
@@ -354,8 +357,8 @@ def _init_animation(
     pt_xv2,
     pt_efield,
 ):
-    ax_xv.set_xlim(x_range)
-    ax_xv.set_ylim(v_min, v_max)
+    # ax_xv.set_xlim(x_range)
+    # ax_xv.set_ylim(v_min, v_max)
     # return (pt_xv1, pt_xv2, pt_ke, pt_fe, pt_te)
     return (pt_xv1, pt_xv2, pt_efield)
 
@@ -426,7 +429,6 @@ def animate_phase_space(
     # t_max = c.t_max
     dt = c.dt
     x_range = c.x_range
-    v_range = c.v_range
     markersize = c.markersize
 
     fig = plt.figure(figsize=(12, 8))
@@ -439,6 +441,7 @@ def animate_phase_space(
     ax_xv.set_ylabel("v")
     ax_xv.set_xlabel("x")
     ax_xv.set_xlim(x_range)
+    v_range = (np.min(d.vx_hist) * 1.2 * c.L, np.max(d.vx_hist) * 1.2 * c.L)
     ax_xv.set_ylim(v_range)
 
     _plot_energy_ax(m, ax_energy)
@@ -448,7 +451,7 @@ def animate_phase_space(
     ax_efield.set_ylabel(r"$E$")
     ax_efield.set_xlabel(r"$x$")
     ax_efield.set_xlim(x_range)
-    ax_efield.set_ylim(np.min(d.efield_hist), np.max(d.efield_hist))
+    ax_efield.set_ylim(np.min(d.ex_hist), np.max(d.ex_hist))
 
     (pt_xv1,) = ax_xv.plot(
         [],
@@ -488,8 +491,8 @@ def animate_phase_space(
     animate = partial(
         _animate_frame,
         x_hist=d.x_hist,
-        v_hist=d.v_hist,
-        efield_hist=d.efield_hist,
+        v_hist=d.vx_hist,
+        efield_hist=d.ex_hist,
         # ke_hist=d.ke_hist,
         # fe_hist=d.fe_hist,
         x_j=c.x_j,
@@ -511,8 +514,8 @@ def animate_phase_space(
     init_animation = partial(
         _init_animation,
         x_range=c.x_range,
-        v_min=c.v_min,
-        v_max=c.v_max,
+        v_min=c.vx_min,
+        v_max=c.vx_max,
         ax_xv=ax_xv,
         pt_xv1=pt_xv1,
         pt_xv2=pt_xv2,

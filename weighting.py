@@ -7,7 +7,7 @@ import numba
 import progressbar
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def weight_particles(x, gp, dx, M, q=1, order=0):
     """Weight particles to grid. Assume x >= 0.
 
@@ -20,6 +20,7 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
     grid points via linear interpolation.
     """
     rho = np.zeros_like(gp)
+    eps = 10 ** -8
 
     # Nearest grid point
     if order == 0:
@@ -31,10 +32,10 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
     elif order == 1:
         for i in numba.prange(x.shape[0]):
             assert x[i] >= 0 and x[i] <= 1
-            j = round(x[i] * M)  # 0 <= j <= m
+            j = round(x[i] / dx)  # 0 <= j <= m
             if (j > 0) and (j > M * x[i]):
                 j = j - 1
-            # if math.floor(x[i] * M) == math.floor(x[i] * M + 0.5)
+            assert j <= x[i] / dx
             # Apply periodic boundary conditions
             if j == M:
                 rho[0] += q / dx
@@ -45,15 +46,15 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
                 rho[j] += q * (gp[j + 1] - x[i]) / dx ** 2
                 rho[j + 1] += q * (x[i] - gp[j]) / dx ** 2
             assert (
-                abs(np.sum(rho * dx) - q * (i + 1)) < 10 ** -6
+                abs(np.sum(rho * dx) - q * (i + 1)) < eps
             )  # charge conservation
     else:
         raise ValueError("Incorrect value 'order', must be 0 or 1.")
-    assert abs(np.sum(rho * dx) - q * x.size) < 10 ** -6  # charge conservation
+    assert abs(np.sum(rho * dx) - q * x.size) < eps  # charge conservation
     return rho
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def weight_particles_new(x, gp, dx, M, q=1, order=0):
     """Weight particles to grid. Assume x >= 0.
 
@@ -95,7 +96,7 @@ def weight_particles_new(x, gp, dx, M, q=1, order=0):
     return rho
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def weight_field(x, gp, e_j, dx, order=0):
     """Obtain weighted field on particle from the grid.
 
@@ -140,7 +141,7 @@ def weight_field(x, gp, e_j, dx, order=0):
     return e_i
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def weight_field_old(x, gp, e_j, dx, order=0):
     """Obtain weighted field on particle from the grid.
 
@@ -193,10 +194,10 @@ if __name__ == "__main__":
             for order in [0, 1]:
                 m = test_m
                 n = test_n
-                t_steps = 1000
+                t_steps = 100
                 print(f"m: {m}, n: {n}, order: {order}")
-                grid_pts = np.linspace(0, 1, m)
-                dx = 1 / (m - 1)
+                grid_pts = np.linspace(0, 1, m + 1)[:-1]
+                dx = 1 / m
                 x = np.random.uniform(0.0, 1.0, n)
                 # Run once to compile weight_particles()
                 rho = weight_particles(x, grid_pts, dx, m, order=order)

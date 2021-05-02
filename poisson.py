@@ -66,23 +66,23 @@ def setup_poisson2(m):
     return (np.linalg.inv(a), a)
 
 
-@numba.njit
-def solve_poisson_fft(rho, inv_a, dx):
+@numba.njit(nogil=True)
+def solve_poisson_fft(rho, kx, dx):
     """Solve Poisson's equation using FFT."""
     m = rho.shape[0]
     with numba.objmode(phi_j="float64[:]"):
         rho_fft = np.fft.fft(rho)
-        kx = np.fft.fftfreq(m) * m
-        kx[0] = 1
+        # kx = np.fft.fftfreq(m) / dx
+        # kx[0] = 1
         phi_fft = (
-            -0.5 * rho_fft / ((np.cos(2.0 * np.pi * kx / (m)) - 1.0) * m ** 2)
+            -0.5 * rho_fft / ((np.cos(2.0 * np.pi * kx / (m)) - 1.0) / dx ** 2)
         )
         phi_fft[0] = 0
         phi_j = np.real(np.fft.ifft(phi_fft))
     return phi_j
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def solve_poisson(rho, inv_a, dx):
     """Calculate electric field on the grid.
 
@@ -95,7 +95,7 @@ def solve_poisson(rho, inv_a, dx):
     return np.dot(inv_a, rho) * dx ** 2
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def solve_poisson2(rho, inv_a, dx):
     """Calculate electric field on the grid.
 
@@ -110,7 +110,7 @@ def solve_poisson2(rho, inv_a, dx):
     return phi
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def compute_field(rho, inv_a, dx):
     """Differentiate phi to get electric field at grid points."""
     rho[0] = 0
@@ -124,7 +124,7 @@ def compute_field(rho, inv_a, dx):
     return e_j
 
 
-@numba.njit
+@numba.njit(nogil=True)
 def compute_field2(rho, inv_a, dx):
     """Differentiate phi to get electric field at grid points."""
     phi = solve_poisson2(rho, inv_a, dx)

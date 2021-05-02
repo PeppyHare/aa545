@@ -29,7 +29,7 @@ class LeapfrogInstabilityConfiguration(Configuration):
     dt = 1.0 / (2 / wp)
     n_periods = 8
 
-    def initialize_particles(self):
+    def set_initial_conditions(self):
         initial_x = np.linspace(self.x_min, self.x_max, self.N + 1)[:-1]
         initial_v = 0.001 * np.sin(initial_x)
         # Split odd/even points by colors for more useful plotting
