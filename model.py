@@ -2,6 +2,7 @@
 Coding project 1: Electrostatic Particle in Cell.
 """
 import math
+import time
 
 import numba
 import numpy as np

@@ -193,7 +193,7 @@ def plot_snapshots_velocity(
     L = c.L
     subsample_ratio = c.subsample_ratio
     x_hist = d.x_hist
-    v_hist = d.vx_hist
+    vx_hist = d.vx_hist
     snapshot_times.sort()
     snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
     snapshots = []
@@ -202,7 +202,7 @@ def plot_snapshots_velocity(
             snapshots.append(
                 {
                     "x": x_hist[:, int(frame / subsample_ratio)],
-                    "v": v_hist[:, int(frame / subsample_ratio)],
+                    "v": vx_hist[:, int(frame / subsample_ratio)],
                     "frame": frame,
                 }
             )
@@ -226,7 +226,7 @@ def plot_snapshots_velocity(
     ax_fv.legend()
     plt.yscale("log")
     plt.tight_layout()
-    save_plot(f"fv_hist_{N}_particles.pdf")
+    save_plot(f"fvx_hist_{N}_particles.pdf")
     if hold:
         plt.show()  # Waits for user to close the plots
 
@@ -254,7 +254,7 @@ def plot_snapshots(
     x_range = c.x_range
     subsample_ratio = c.subsample_ratio
     x_hist = d.x_hist
-    v_hist = d.vx_hist
+    vx_hist = d.vx_hist
     snapshot_times.sort()
     snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
     snapshots = []
@@ -263,7 +263,7 @@ def plot_snapshots(
             snapshots.append(
                 {
                     "x": x_hist[:, int(frame / subsample_ratio)],
-                    "v": v_hist[:, int(frame / subsample_ratio)],
+                    "v": vx_hist[:, int(frame / subsample_ratio)],
                     "frame": frame,
                 }
             )
@@ -324,7 +324,7 @@ def plot_traces(
         m.run()
     N = c.N
     x_hist = d.x_hist
-    v_hist = d.vx_hist
+    vx_hist = d.vx_hist
     x_range = c.x_range
     L = c.L
     x_min = c.x_min
@@ -332,7 +332,7 @@ def plot_traces(
     ax_xv = fig.add_subplot(211)
     for i in range(N)[:: int(N / max_traces)]:
         position = (x_hist[i, start_at_frame:] * L) + x_min
-        velocity = v_hist[i, start_at_frame:] * L
+        velocity = vx_hist[i, start_at_frame:] * L
         ax_xv.plot(position, velocity, ".", markersize=1)
         ax_xv.set_xlabel("x")
         ax_xv.set_ylabel("v")
@@ -347,39 +347,19 @@ def plot_traces(
     return ax_energy
 
 
-def _init_animation(
-    # x_range, v_min, v_max, ax_xv, pt_xv1, pt_xv2, pt_ke, pt_fe, pt_te
-    x_range,
-    v_min,
-    v_max,
-    ax_xv,
-    pt_xv1,
-    pt_xv2,
-    pt_efield,
-):
-    # ax_xv.set_xlim(x_range)
-    # ax_xv.set_ylim(v_min, v_max)
-    # return (pt_xv1, pt_xv2, pt_ke, pt_fe, pt_te)
-    return (pt_xv1, pt_xv2, pt_efield)
-
-
 def _animate_frame(
     frame,
     x_hist,
-    v_hist,
+    vx_hist,
+    vy_hist,
     efield_hist,
     x_j,
-    # ke_hist,
-    # fe_hist,
     x_min,
     L,
-    # time_axis,
-    # pt_ke,
-    # pt_fe,
-    # pt_te,
-    # ax_efield,
     pt_xv1,
     pt_xv2,
+    pt_vv1,
+    pt_vv2,
     pt_efield,
     time_text,
     vline_t,
@@ -391,20 +371,16 @@ def _animate_frame(
     vline_t.set_xdata([current_time, current_time])
     N = x_hist.shape[0]
     n2 = math.ceil(N / 2)
-    pt_xv1.set_data((x_hist[:n2, frame] * L) + x_min, (v_hist[:n2, frame] * L))
+    pt_xv1.set_data((x_hist[:n2, frame] * L) + x_min, (vx_hist[:n2, frame] * L))
+    pt_vv1.set_data((vx_hist[:n2, frame] * L), (vy_hist[:n2, frame] * L))
     if n2 > 0:
         pt_xv2.set_data(
-            (x_hist[n2:, frame] * L) + x_min, (v_hist[n2:, frame] * L)
+            (x_hist[n2:, frame] * L) + x_min, (vx_hist[n2:, frame] * L)
         )
-    # ax_efield.set_ylim(
-    #     np.min(efield_hist[:, frame]), np.max(efield_hist[:, frame])
-    # )
+        pt_vv2.set_data((vx_hist[n2:, frame] * L), (vy_hist[n2:, frame] * L))
     pt_efield.set_data((x_j * L) + x_min, efield_hist[:, frame])
-    # pt_ke.set_data(time_axis, ke_hist)
-    # pt_fe.set_data(time_axis, fe_hist)
-    # pt_te.set_data(time_axis, fe_hist + ke_hist)
-    # return (pt_xv1, pt_xv2, time_text, pt_ke, pt_fe, pt_te)
-    return (pt_xv1, pt_xv2, time_text, vline_t, pt_efield)
+
+    return (pt_xv1, pt_xv2, pt_vv1, pt_vv2, time_text, vline_t, pt_efield)
 
 
 def animate_phase_space(
@@ -426,23 +402,30 @@ def animate_phase_space(
         m.run()
     c = m.c
     d = m.d
-    # t_max = c.t_max
     dt = c.dt
     x_range = c.x_range
     markersize = c.markersize
 
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=(13, 8))
     fig.suptitle(plot_title)
-    ax_xv = plt.subplot2grid((2, 2), (0, 0), colspan=2, rowspan=1)
-    ax_energy = plt.subplot2grid((2, 2), (1, 0), colspan=1, rowspan=1)
-    ax_efield = plt.subplot2grid((2, 2), (1, 1), colspan=1, rowspan=1)
+    ax_xv = plt.subplot2grid((2, 3), (0, 0), colspan=2, rowspan=1)
+    ax_vv = plt.subplot2grid((2, 3), (0, 2), colspan=1, rowspan=1)
+    ax_energy = plt.subplot2grid((2, 3), (1, 0), colspan=1, rowspan=1)
+    ax_efield = plt.subplot2grid((2, 3), (1, 1), colspan=1, rowspan=1)
 
     ax_xv.set_title("Phase space animation")
     ax_xv.set_ylabel("v")
     ax_xv.set_xlabel("x")
     ax_xv.set_xlim(x_range)
-    v_range = (np.min(d.vx_hist) * 1.2 * c.L, np.max(d.vx_hist) * 1.2 * c.L)
-    ax_xv.set_ylim(v_range)
+    vx_range = (np.min(d.vx_hist) * 1.2 * c.L, np.max(d.vx_hist) * 1.2 * c.L)
+    ax_xv.set_ylim(vx_range)
+
+    ax_vv.set_title("Velocity space animation")
+    ax_vv.set_ylabel(r"$v_y$")
+    ax_vv.set_xlabel(r"$v_x$")
+    ax_vv.set_xlim(vx_range)
+    vy_range = (np.min(d.vy_hist) * 1.2 * c.L, np.max(d.vy_hist) * 1.2 * c.L)
+    ax_vv.set_ylim(vy_range)
 
     _plot_energy_ax(m, ax_energy)
     vline_t = ax_energy.axvline(0, ls="--", color="darkgray", zorder=10)
@@ -459,7 +442,6 @@ def animate_phase_space(
         ".",
         color="tab:orange",
         markersize=markersize,
-        label="xv",
     )
     (pt_xv2,) = ax_xv.plot(
         [],
@@ -467,23 +449,24 @@ def animate_phase_space(
         ".",
         color="tab:cyan",
         markersize=markersize,
-        label="xv",
+    )
+
+    (pt_vv1,) = ax_vv.plot(
+        [],
+        [],
+        ".",
+        color="tab:orange",
+        markersize=markersize,
+    )
+    (pt_vv2,) = ax_vv.plot(
+        [],
+        [],
+        ".",
+        color="tab:cyan",
+        markersize=markersize,
     )
 
     (pt_efield,) = ax_efield.plot([], [], "-", color="tab:green", label="E")
-    # (pt_ke,) = ax_energy.plot(
-    #     c.time_axis, d.ke_hist, "b-", markersize=1, label="ke"
-    # )
-    # (pt_fe,) = ax_energy.plot(
-    #     c.time_axis, d.ke_hist, "g-", markersize=1, label="fe"
-    # )
-    # (pt_te,) = ax_energy.plot(
-    #     c.time_axis, d.ke_hist, "k-", markersize=1, label="total"
-    # )
-    # ax_energy.legend(
-    #     [pt_ke, pt_fe, pt_te],
-    #     [pt_ke.get_label(), pt_fe.get_label(), pt_te.get_label()],
-    # )
 
     # Add a label to the frame showing the current time. Updated each time step
     # in update()
@@ -491,47 +474,42 @@ def animate_phase_space(
     animate = partial(
         _animate_frame,
         x_hist=d.x_hist,
-        v_hist=d.vx_hist,
+        vx_hist=d.vx_hist,
+        vy_hist=d.vy_hist,
         efield_hist=d.ex_hist,
-        # ke_hist=d.ke_hist,
-        # fe_hist=d.fe_hist,
         x_j=c.x_j,
         x_min=c.x_min,
         L=c.L,
-        # ax_efield=ax_efield,
-        # time_axis=c.time_axis,
-        # pt_ke=pt_ke,
-        # pt_fe=pt_fe,
-        # pt_te=pt_te,
         pt_xv1=pt_xv1,
         pt_xv2=pt_xv2,
+        pt_vv1=pt_vv1,
+        pt_vv2=pt_vv2,
         pt_efield=pt_efield,
         time_text=time_text,
         vline_t=vline_t,
         subsample_ratio=c.subsample_ratio,
         dt=dt,
     )
-    init_animation = partial(
-        _init_animation,
-        x_range=c.x_range,
-        v_min=c.vx_min,
-        v_max=c.vx_max,
-        ax_xv=ax_xv,
-        pt_xv1=pt_xv1,
-        pt_xv2=pt_xv2,
-        pt_efield=pt_efield,
-        # pt_ke=pt_ke,
-        # pt_fe=pt_fe,
-        # pt_te=pt_te,
-    )
+
+    # TODO: Make sure the history vectors are properly sized
+    last_frame = d.x_hist.shape[1]
+    for i in range(d.x_hist.shape[1]):
+        if (
+            np.sum(
+                np.abs(d.vx_hist[:, -(i + 1)]) + np.abs(d.x_hist[:, -(i + 1)])
+            )
+            > 10 ** -12
+        ):
+            last_frame = d.x_hist.shape[1] - i
+            break
+
     # Evolve positions until t_max. Animate particle positions in phase space.
     animation = FuncAnimation(
         fig,
         animate,
-        frames=range(d.x_hist.shape[1]),
-        init_func=init_animation,
+        frames=range(last_frame),
         blit=True,
-        interval=3,
+        interval=1,
         repeat=repeat,
     )
     plt.tight_layout()

@@ -47,8 +47,16 @@ class DGHConfiguration(Configuration):
 
     def set_initial_conditions(self):
         v0 = self.v0
+        # Try to fill the ring distribution uniformly at each position
+        n_groups = int(self.N ** (1/2))
+        self.initial_x = np.zeros(self.N)
+        self.initial_vx = np.zeros(self.N)
+        self.initial_vy = np.zeros(self.N)
+        for group in range(n_groups):
+            
         self.initial_x = np.linspace(self.x_min, self.x_max, self.N + 1)[:-1]
         theta = 2 * np.pi * np.arange(self.N) / self.N
+        # np.random.shuffle(theta)
         self.initial_vx = v0 * np.cos(theta)
         self.initial_vy = v0 * np.sin(theta)
 
@@ -56,7 +64,7 @@ class DGHConfiguration(Configuration):
 wc = 10 ** (-1 / 2)
 k = 1
 v0 = 4.5 * wc / k
-c = DGHConfiguration(v0=v0)
+c = DGHConfiguration(v0=v0, n_periods=1, dt=0.01)
 m = PicModel(c)
 m.run()
 d = m.d
