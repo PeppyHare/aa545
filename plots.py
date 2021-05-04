@@ -73,7 +73,6 @@ def plot_initial_distribution(m: PicModel, hold=True):
     """Plot initial particle configuration using pyplot."""
     c = m.c
     print("Generating plots of initial particle state.")
-    bin_width = c.L / c.M
 
     fig1 = plt.figure(figsize=(12, 8))
     fig1.suptitle(f"Initial distribution (n={c.N})")
@@ -101,9 +100,10 @@ def plot_initial_distribution(m: PicModel, hold=True):
 
     # Plot initial velocity histogram
     ax_init_velocity = fig1.add_subplot(2, 2, 2)
-    bins = math.ceil((c.vx_range[1] - c.vx_range[0]) / bin_width)
+    bins = c.M
     ax_init_velocity.hist(vx_i_unorm, bins=bins, range=c.vx_range)
-    ax_init_velocity.set_xlabel(r"$v$")
+    ax_init_velocity.set_xlabel(r"$v_x$")
+    ax_init_velocity.set_ylabel(r"$f_0(v_x)$")
     plt.xlim(c.x_range)
     plt.title("Velocity")
 
@@ -129,7 +129,7 @@ def plot_initial_distribution(m: PicModel, hold=True):
     )
     plt.xlim(c.x_range)
     ax_init_phase.set_xlabel(r"$x$")
-    ax_init_phase.set_ylabel(r"$v$")
+    ax_init_phase.set_ylabel(r"$v_x$")
     # Plot grid points
     if c.plot_grid_lines:
         for grid_pt in x_j_unorm:

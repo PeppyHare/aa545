@@ -1,5 +1,6 @@
 """Dory-Guest-Harris Instability."""
 import multiprocessing
+import random
 
 import numpy as np
 
@@ -52,14 +53,15 @@ class DGHConfiguration(Configuration):
         self.initial_x = np.zeros(self.N)
         self.initial_vx = np.zeros(self.N)
         self.initial_vy = np.zeros(self.N)
-        theta = 2 * np.pi * np.arange(n_ring) / n_ring
+
         init_positions = np.linspace(self.x_min, self.x_max, n_x + 1)[:-1] + (
             (self.x_max - self.x_min) / n_x / 2
         )
-        init_positions += 0.01 * np.cos(self.k * init_positions)
+        theta = 2 * np.pi * np.arange(n_ring) / n_ring
+        init_positions += 0.0001 * np.cos(self.k * init_positions)
         for group in range(n_x):
             # Disrupt any correlation between x and theta
-            # np.random.shuffle(theta)
+            np.random.shuffle(theta)
             start_idx = group * n_ring
             end_idx = (group + 1) * n_ring
             self.initial_x[start_idx:end_idx] = init_positions[group]
@@ -71,25 +73,25 @@ def calc_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1):
     v0 = param * wc / k
     print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
     c = DGHConfiguration(
-        v0=v0, n_periods=15, dt=0.01, k=k, M=128, N=4096, wp=wp, wc=wc
+        v0=v0, n_periods=100, dt=0.01, k=k, M=256, N=8192, wp=wp, wc=wc
     )
     m = PicModel(c)
-    # plots.plot_initial_distribution(m)
+    plots.plot_initial_distribution(m)
     m.run()
     plots.animate_phase_space(
-        m, plot_title="Dory-Guest-Harris Instability", repeat=True, hold=False
+        m, plot_title="Dory-Guest-Harris Instability", repeat=True, hold=True
     )
     # Save the data!
     save_data(m, f"dgh_{param:.2f}.p")
 
 
-# calc_dgh(4.5)
+calc_dgh(6.0, k=1)
 
-if __name__ == "__main__":
-    param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
-    with multiprocessing.Pool(
-        min(len(param_trials), multiprocessing.cpu_count())
-    ) as p:
-        p.map(calc_dgh, param_trials)
-        p.close()
-    print("phew, that was some work!")
+# if __name__ == "__main__":
+#     param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
+#     with multiprocessing.Pool(
+#         min(len(param_trials), multiprocessing.cpu_count())
+#     ) as p:
+#         p.map(calc_dgh, param_trials)
+#         p.close()
+#     print("phew, that was some work!")
