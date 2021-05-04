@@ -10,7 +10,6 @@ import numpy as np
 
 from model import PicModel
 from util import save_plot, create_folder
-from weighting import weight_particles
 
 
 plt.style.use("dark_background")
@@ -74,52 +73,31 @@ def plot_initial_distribution(m: PicModel, hold=True):
     """Plot initial particle configuration using pyplot."""
     c = m.c
     print("Generating plots of initial particle state.")
-    bin_width = 0.01
+    bin_width = c.L / c.M
 
     fig1 = plt.figure(figsize=(12, 8))
     fig1.suptitle(f"Initial distribution (n={c.N})")
-    # Get the un-normalized and normalized particle positions and velocities
+    # Get the un-normalized grid positions and velocities
     x_i_unorm = c.initial_x
-    x_i = (x_i_unorm - c.x_min) / c.L
     vx_i_unorm = c.initial_vx
-    x_j = c.x_j
     x_j_unorm = (c.x_j * c.L) + c.x_min
 
     # Plot initial weighted particle positions on the grid
-    rho_weight_ngp = weight_particles(np.sort(x_i), x_j, c.dx, c.M, order=0)
-    print(f"Total charge (ngp): {np.sum(rho_weight_ngp * c.dx)}")
-    rho_weight_lin = weight_particles(np.sort(x_i), x_j, c.dx, c.M, order=1)
-    print(f"Total charge (linear): {np.sum(rho_weight_lin * c.dx)}")
-    ax_init_position = fig1.add_subplot(2, 2, 1)
-    (pt_ngp,) = ax_init_position.step(
-        np.sort(x_j_unorm),
-        rho_weight_ngp,
-        color="r",
-        marker="o",
-        where="mid",
-        linewidth=1,
-        label="NGP",
-        markersize=1,
-    )
-    (pt_linear,) = ax_init_position.plot(
-        np.sort(x_j_unorm),
-        rho_weight_lin,
+    ax_init_density = fig1.add_subplot(2, 2, 1)
+    (pt_rho,) = ax_init_density.plot(
+        x_j_unorm,
+        m.d.initial_rho,
         color="g",
         marker="o",
         linestyle="--",
-        linewidth=2,
-        label="Linear",
-        markersize=1,
+        linewidth=1,
+        label=r"$\rho_0$",
+        markersize=c.markersize,
     )
-    ax_init_position.legend(
-        [pt_ngp, pt_linear],
-        [pt_ngp.get_label(), pt_linear.get_label()],
-    )
-    ax_init_position.set_ylim(bottom=0)
-    ax_init_position.set_xlabel(r"$x$")
-    ax_init_position.set_ylabel("Density")
+    ax_init_density.set_xlabel(r"$x$")
+    ax_init_density.set_ylabel(r"$\rho$")
     plt.xlim(c.x_range)
-    plt.title("Position")
+    plt.title("Initial density")
 
     # Plot initial velocity histogram
     ax_init_velocity = fig1.add_subplot(2, 2, 2)
@@ -161,7 +139,7 @@ def plot_initial_distribution(m: PicModel, hold=True):
                 color="k",
                 linewidth=0.2,
             )
-            ax_init_position.axvline(
+            ax_init_density.axvline(
                 grid_pt,
                 linestyle="--",
                 color="k",
@@ -248,7 +226,6 @@ def plot_snapshots(
         snapshot_times = [0, 0.25 * t_max, 0.5 * t_max, 0.75 * t_max, t_max]
     dt = c.dt
     t_steps = c.t_steps
-    N = c.N
     L = c.L
     x_min = c.x_min
     x_range = c.x_range
@@ -396,7 +373,7 @@ def animate_phase_space(
     kinetic energy.
 
     Important Note: Using hold=False will save a .mp4 of the animation to disk,
-    but requires ffmpeg to be installed and accessible on the PATH.
+    but requires ffmpeg to be installed and accessible on the $PATH.
     """
     if not m.has_run:
         m.run()
@@ -410,8 +387,8 @@ def animate_phase_space(
     fig.suptitle(plot_title)
     ax_xv = plt.subplot2grid((2, 3), (0, 0), colspan=2, rowspan=1)
     ax_vv = plt.subplot2grid((2, 3), (0, 2), colspan=1, rowspan=1)
-    ax_energy = plt.subplot2grid((2, 3), (1, 0), colspan=1, rowspan=1)
-    ax_efield = plt.subplot2grid((2, 3), (1, 1), colspan=1, rowspan=1)
+    ax_energy = plt.subplot2grid((2, 3), (1, 0), colspan=2, rowspan=1)
+    ax_efield = plt.subplot2grid((2, 3), (1, 2), colspan=1, rowspan=1)
 
     ax_xv.set_title("Phase space animation")
     ax_xv.set_ylabel("v")
@@ -425,7 +402,8 @@ def animate_phase_space(
     ax_vv.set_xlabel(r"$v_x$")
     ax_vv.set_xlim(vx_range)
     vy_range = (np.min(d.vy_hist) * 1.2 * c.L, np.max(d.vy_hist) * 1.2 * c.L)
-    ax_vv.set_ylim(vy_range)
+    if vy_range[1] - vy_range[0] > 10 ** -12:
+        ax_vv.set_ylim(vy_range)
 
     _plot_energy_ax(m, ax_energy)
     vline_t = ax_energy.axvline(0, ls="--", color="darkgray", zorder=10)

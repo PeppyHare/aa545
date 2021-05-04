@@ -1,7 +1,9 @@
 """Utility functions"""
 
+import datetime
 import os
 from pathlib import Path
+import pickle
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -33,3 +35,22 @@ def count_crossings(arr):
             is_above = True
             crossings += 1
     return crossings
+
+
+def save_data(data, filename):
+    now_seconds = (
+        datetime.datetime.now()
+        - datetime.datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+    ).total_seconds()
+    create_folder(os.path.join(os.getcwd(), "saved_data", "pic1"))
+    path = os.path.join(
+        os.getcwd(),
+        "saved_data",
+        "pic1",
+        f"{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}_{filename}",
+    )
+    with open(path, "wb") as f:
+        pickle.dump(data, f)
+        print(f"Saved data to file {path}")

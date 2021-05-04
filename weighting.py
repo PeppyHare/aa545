@@ -31,20 +31,21 @@ def weight_particles(x, gp, dx, M, q=1, order=0):
     # Linear weighting
     elif order == 1:
         for i in numba.prange(x.shape[0]):
-            assert x[i] >= 0 and x[i] <= 1
-            j = round(x[i] / dx)  # 0 <= j <= m
-            if (j > 0) and (j > M * x[i]):
+            xi = x[i] % 1.0
+            assert xi >= 0 and xi <= 1
+            j = round(xi / dx)  # 0 <= j <= m
+            if (j > 0) and (j > M * xi):
                 j = j - 1
-            assert j <= x[i] / dx
+            assert j <= xi / dx
             # Apply periodic boundary conditions
             if j == M:
                 rho[0] += q / dx
             elif j == M - 1:
-                rho[j] += q * (gp[j] + dx - x[i]) / dx ** 2
-                rho[0] += q * (x[i] - gp[j]) / dx ** 2
+                rho[j] += q * (gp[j] + dx - xi) / dx ** 2
+                rho[0] += q * (xi - gp[j]) / dx ** 2
             else:
-                rho[j] += q * (gp[j + 1] - x[i]) / dx ** 2
-                rho[j + 1] += q * (x[i] - gp[j]) / dx ** 2
+                rho[j] += q * (gp[j + 1] - xi) / dx ** 2
+                rho[j + 1] += q * (xi - gp[j]) / dx ** 2
             assert (
                 abs(np.sum(rho * dx) - q * (i + 1)) < eps
             )  # charge conservation

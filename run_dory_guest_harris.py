@@ -1,15 +1,10 @@
-"""Simple particle undergoing cyclotron motion.
-
-Initializes a single particle with an initial velocity in the y-direction in a
-static magnetic field. Particle begins centered on a spatially periodic domain,
-and has no initial velocity in the x-direction.
-"""
+"""Dory-Guest-Harris Instability."""
 import numpy as np
 
 from configuration import Configuration
 from model import PicModel
+from util import save_data
 import plots
-from util import count_crossings
 
 
 class DGHConfiguration(Configuration):
@@ -17,15 +12,16 @@ class DGHConfiguration(Configuration):
     x_max = np.pi
     wp = 1.0
     markersize = 1
-    max_history_steps = 1000
+    max_history_steps = 5000
 
     def __init__(
         self,
         v0,
-        M=2048,
+        M=64,
         N=4096,
         k=1,
-        wc=10 ** (-1 / 2),
+        wc=1.0,
+        wp=1.0,
         n_periods=0.1,
         dt=0.005,
     ):
@@ -34,6 +30,7 @@ class DGHConfiguration(Configuration):
         self.k = k
         self.dt = dt
         self.wc = wc
+        self.wp = wp
         self.v0 = v0
         self.x_min = -np.pi
         self.x_max = np.pi
@@ -48,27 +45,41 @@ class DGHConfiguration(Configuration):
     def set_initial_conditions(self):
         v0 = self.v0
         # Try to fill the ring distribution uniformly at each position
-        n_groups = int(self.N ** (1/2))
+        n_ring = 32  # Number of points per ring in vx/vy
+        n_x = int(self.N / n_ring)  # Number of positions to spread rings over
         self.initial_x = np.zeros(self.N)
         self.initial_vx = np.zeros(self.N)
         self.initial_vy = np.zeros(self.N)
-        for group in range(n_groups):
-            
-        self.initial_x = np.linspace(self.x_min, self.x_max, self.N + 1)[:-1]
-        theta = 2 * np.pi * np.arange(self.N) / self.N
-        # np.random.shuffle(theta)
-        self.initial_vx = v0 * np.cos(theta)
-        self.initial_vy = v0 * np.sin(theta)
+        theta = 2 * np.pi * np.arange(n_ring) / n_ring
+        init_positions = np.linspace(self.x_min, self.x_max, n_x + 1)[:-1] + (
+            (self.x_max - self.x_min) / n_x / 2
+        )
+        init_positions += 0.01 * np.cos(self.k * init_positions)
+        for group in range(n_x):
+            # Disrupt any correlation between x and theta
+            # np.random.shuffle(theta)
+            start_idx = group * n_ring
+            end_idx = (group + 1) * n_ring
+            self.initial_x[start_idx:end_idx] = init_positions[group]
+            self.initial_vx[start_idx:end_idx] = v0 * np.cos(theta)
+            self.initial_vy[start_idx:end_idx] = v0 * np.sin(theta)
 
 
+param = 4.1
 wc = 10 ** (-1 / 2)
+wp = 1
 k = 1
-v0 = 4.5 * wc / k
-c = DGHConfiguration(v0=v0, n_periods=1, dt=0.01)
+v0 = param * wc / k
+print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
+c = DGHConfiguration(
+    v0=v0, n_periods=15, dt=0.01, k=k, M=128, N=4096, wp=wp, wc=wc
+)
 m = PicModel(c)
+# plots.plot_initial_distribution(m)
 m.run()
 d = m.d
-d.fe_hist[0] = d.fe_hist[1]
-freq = count_crossings(d.ke_hist) / 4 / (c.n_periods / c.wp)
-print(f"Measured frequency: {freq:.2f}, wc: {c.wc:.2f}")
-plots.animate_phase_space(m, plot_title="Cyclotron Motion", repeat=True)
+plots.animate_phase_space(
+    m, plot_title="Dory-Guest-Harris Instability", repeat=True, hold=False
+)
+# Save the data!
+save_data(m, f"dgh_{param:.2f}.p")

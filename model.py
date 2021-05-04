@@ -2,7 +2,6 @@
 Coding project 1: Electrostatic Particle in Cell.
 """
 import math
-import time
 
 import numba
 import numpy as np
@@ -81,6 +80,7 @@ class PicModel:
         vy_hist,
         ex_hist,
         ey_hist,
+        rho_hist,
         subsample_ratio,
         M,
         dx,
@@ -120,7 +120,9 @@ class PicModel:
             eps0 * weight_particles(x_i, x_j, dx, M, q, order=weighting_order)
             + rho_bg
         )
-
+        if frame % subsample_ratio == 0:
+            sampled_frame = int(frame / subsample_ratio)
+            rho_hist[:, sampled_frame] += rho
         # Solve Poisson's equation
         ex_j = compute_field(rho, inv_a, dx)
         for j in range(M):
@@ -147,7 +149,8 @@ class PicModel:
         #   -∆t/2    0   ∆t/2    ∆t
 
         # Half acceleration, then rotation by -wc*dt
-        (vx_ip, vy_ip) = rotate_xy(vx_i + dv / 2, vy_i, -wc * dt)
+        vx_i += dv / 2
+        (vx_ip, vy_ip) = rotate_xy(vx_i, vy_i, -wc * dt)
 
         # Compute kinetic energy, momentum
         # KE = 0.5 * m * (v_x(t-1/2)*v_x(t+1/2) + v_y(t-1/2)*v_y(t+1/2))
@@ -159,6 +162,7 @@ class PicModel:
         vy_i += vy_ip - vy_i
 
         # Second half acceleration
+        vx_i += dv / 2
 
         # Push particles forward, now that we have v_i[n+1/2]
 
@@ -206,6 +210,7 @@ class PicModel:
                 vy_hist=d.vy_hist,
                 ex_hist=d.ex_hist,
                 ey_hist=d.ey_hist,
+                rho_hist=d.rho_hist,
                 subsample_ratio=c.subsample_ratio,
                 M=c.M,
                 dx=c.dx,

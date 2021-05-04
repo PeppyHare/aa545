@@ -185,3 +185,6 @@ class ParticleData:
         # Subsampled history of electric field
         self.ex_hist = np.zeros((c.M, c.history_steps + 1))
         self.ey_hist = np.zeros((c.M, c.history_steps + 1))
+
+        # Subsampled history of particle density
+        self.rho_hist = np.zeros((c.M, c.history_steps + 1))

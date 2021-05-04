@@ -7,6 +7,9 @@ plots/*/*.png
 plots/*/*.jpeg
 plots/*/*.mp4
 
+# Any saved data runs
+saved_data/*
+
 # VScode settings
 .vscode/*
 
