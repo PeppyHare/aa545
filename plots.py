@@ -508,7 +508,9 @@ def animate_phase_space(
         )
         animation.save(
             animation_name,
-            progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
+            fps=int(last_frame / 15),  # 15 second animation
+            dpi="figure",
+            # progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
         )
         plt.close(fig)
         print(f"Saved animation {animation_name} to disk.")

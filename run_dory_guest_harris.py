@@ -1,4 +1,6 @@
 """Dory-Guest-Harris Instability."""
+import multiprocessing
+
 import numpy as np
 
 from configuration import Configuration
@@ -12,7 +14,7 @@ class DGHConfiguration(Configuration):
     x_max = np.pi
     wp = 1.0
     markersize = 1
-    max_history_steps = 5000
+    max_history_steps = 2000
 
     def __init__(
         self,
@@ -65,21 +67,29 @@ class DGHConfiguration(Configuration):
             self.initial_vy[start_idx:end_idx] = v0 * np.sin(theta)
 
 
-param = 4.1
-wc = 10 ** (-1 / 2)
-wp = 1
-k = 1
-v0 = param * wc / k
-print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
-c = DGHConfiguration(
-    v0=v0, n_periods=15, dt=0.01, k=k, M=128, N=4096, wp=wp, wc=wc
-)
-m = PicModel(c)
-# plots.plot_initial_distribution(m)
-m.run()
-d = m.d
-plots.animate_phase_space(
-    m, plot_title="Dory-Guest-Harris Instability", repeat=True, hold=False
-)
-# Save the data!
-save_data(m, f"dgh_{param:.2f}.p")
+def calc_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1):
+    v0 = param * wc / k
+    print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
+    c = DGHConfiguration(
+        v0=v0, n_periods=15, dt=0.01, k=k, M=128, N=4096, wp=wp, wc=wc
+    )
+    m = PicModel(c)
+    # plots.plot_initial_distribution(m)
+    m.run()
+    plots.animate_phase_space(
+        m, plot_title="Dory-Guest-Harris Instability", repeat=True, hold=False
+    )
+    # Save the data!
+    save_data(m, f"dgh_{param:.2f}.p")
+
+
+# calc_dgh(4.5)
+
+if __name__ == "__main__":
+    param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
+    with multiprocessing.Pool(
+        min(len(param_trials), multiprocessing.cpu_count())
+    ) as p:
+        p.map(calc_dgh, param_trials)
+        p.close()
+    print("phew, that was some work!")
