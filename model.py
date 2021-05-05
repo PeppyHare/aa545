@@ -148,8 +148,9 @@ class PicModel:
         #     |      |     |      |
         #   -∆t/2    0   ∆t/2    ∆t
 
-        # Half acceleration, then rotation by -wc*dt
+        # Half acceleration
         vx_i += dv / 2
+        # then, rotation by -wc*dt
         (vx_ip, vy_ip) = rotate_xy(vx_i, vy_i, -wc * dt)
 
         # Compute kinetic energy, momentum

@@ -21,10 +21,10 @@ class CyclotronConfiguration(Configuration):
     vx_max = 1.2
     vy_min = -1.2
     vy_max = 1.2
-    wp = 10.0
+    wp = 1.0
     wc = 1.0
-    dt = 0.001
-    n_periods = 8
+    dt = 0.05
+    n_periods = 80
     markersize = 10
     max_history_steps = 1000
 

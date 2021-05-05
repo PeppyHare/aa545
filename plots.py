@@ -12,9 +12,6 @@ from model import PicModel
 from util import save_plot, create_folder
 
 
-plt.style.use("dark_background")
-
-
 def _plot_energy_ax(m: PicModel, ax_energy):
     c = m.c
     d = m.d

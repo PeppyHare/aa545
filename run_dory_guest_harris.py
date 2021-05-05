@@ -3,11 +3,14 @@ import multiprocessing
 import random
 
 import numpy as np
+from matplotlib import pyplot as plt
 
 from configuration import Configuration
 from model import PicModel
 from util import save_data
 import plots
+
+plt.style.use("dark_background")
 
 
 class DGHConfiguration(Configuration):
@@ -58,10 +61,10 @@ class DGHConfiguration(Configuration):
             (self.x_max - self.x_min) / n_x / 2
         )
         theta = 2 * np.pi * np.arange(n_ring) / n_ring
-        init_positions += 0.0001 * np.cos(self.k * init_positions)
+        init_positions += 0.00001 * np.cos(self.k * init_positions)
         for group in range(n_x):
             # Disrupt any correlation between x and theta
-            np.random.shuffle(theta)
+            # np.random.shuffle(theta)
             start_idx = group * n_ring
             end_idx = (group + 1) * n_ring
             self.initial_x[start_idx:end_idx] = init_positions[group]
@@ -72,20 +75,27 @@ class DGHConfiguration(Configuration):
 def calc_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1):
     v0 = param * wc / k
     print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
+    print("Setting up initial particle configuration.")
     c = DGHConfiguration(
-        v0=v0, n_periods=100, dt=0.01, k=k, M=256, N=8192, wp=wp, wc=wc
+        v0=v0, n_periods=30, dt=0.05, k=k, M=256, N=8192, wp=wp, wc=wc
     )
+    print("Initializing model and compiling subroutines.")
     m = PicModel(c)
-    plots.plot_initial_distribution(m)
+    # plots.plot_initial_distribution(m)
     m.run()
     plots.animate_phase_space(
-        m, plot_title="Dory-Guest-Harris Instability", repeat=True, hold=True
+        m,
+        plot_title=(
+            f"Dory-Guest-Harris Instability: $k v_0 / \omega_c = {param:.2f}$"
+        ),
+        repeat=True,
+        hold=True,
     )
     # Save the data!
     save_data(m, f"dgh_{param:.2f}.p")
 
 
-calc_dgh(6.0, k=1)
+calc_dgh(4.1, k=1)
 
 # if __name__ == "__main__":
 #     param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
