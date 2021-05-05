@@ -77,11 +77,12 @@ def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
     print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
     print("Setting up initial particle configuration.")
     c = DGHConfiguration(
-        v0=v0, n_periods=n_periods, dt=0.005, k=k, M=128, N=16384, wp=wp, wc=wc
+        v0=v0, n_periods=n_periods, dt=0.1, k=k, M=64, N=8192, wp=wp, wc=wc
     )
     print("Initializing model and compiling subroutines.")
     m = PicModel(c)
     # plots.plot_initial_distribution(m)
+    print(f"Time steps: {c.t_steps}")
     m.run()
     plots.animate_phase_space(
         m,
@@ -96,7 +97,7 @@ def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
 
 
 if __name__ == "__main__":
-    run_dgh(6.1, k=1, n_periods=45)
+    run_dgh(4.5, k=1, n_periods=30)
     # param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
     # with multiprocessing.Pool(
     #     min(len(param_trials), multiprocessing.cpu_count())
