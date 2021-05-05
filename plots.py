@@ -12,26 +12,26 @@ from model import PicModel
 from util import save_plot, create_folder
 
 
-def _plot_energy_ax(m: PicModel, ax_energy):
+def _plot_energy_ax(m: PicModel, ax_energy, title="Energy"):
     c = m.c
     d = m.d
     t_max = c.t_max
     ke_hist = d.ke_hist
     fe_hist = d.fe_hist
     time_axis = c.time_axis
-    ax_energy.set_title("Energy")
+    ax_energy.set_title(title)
     ax_energy.set_xlim(0, t_max)
     ax_energy.set_ylabel("energy")
     ax_energy.set_xlabel("time")
     ax_energy.set_yscale("log")
     (pt_te,) = ax_energy.plot(
-        time_axis, ke_hist + fe_hist, "r-", markersize=1, label="total"
+        time_axis, ke_hist + fe_hist, "r-", markersize=1, label="Total Energy"
     )
     (pt_ke,) = ax_energy.plot(
-        time_axis, ke_hist, "b-", markersize=1, label="ke"
+        time_axis, ke_hist, "b-", markersize=1, label="Kinetic Energy"
     )
     (pt_fe,) = ax_energy.plot(
-        time_axis, fe_hist, "g-", markersize=1, label="fe"
+        time_axis, fe_hist, "g-", markersize=1, label="Electric Field Energy"
     )
     ax_energy.legend(
         [pt_ke, pt_fe, pt_te],
@@ -47,9 +47,8 @@ def plot_energy_history(
     """Generate log-log plot of the total kinetic and field energy history."""
     print("Generating plots of the total energy history.")
     fig = plt.figure(figsize=(12, 6))
-    fig.suptitle(plot_title)
     ax_energy = fig.add_subplot(2, 1, (1, 2))
-    _plot_energy_ax(m, ax_energy)
+    _plot_energy_ax(m, ax_energy, title=plot_title)
     plt.tight_layout()
     now_seconds = (
         datetime.datetime.now()
@@ -95,14 +94,23 @@ def plot_initial_distribution(m: PicModel, hold=True):
     plt.xlim(c.x_range)
     plt.title("Initial density")
 
-    # Plot initial velocity histogram
+    # Plot initial velocity distribution
     ax_init_velocity = fig1.add_subplot(2, 2, 2)
     bins = c.M
-    ax_init_velocity.hist(vx_i_unorm, bins=bins, range=c.vx_range)
+    vx_range = (np.min(c.initial_vx) * 1.2, np.max(c.initial_vx) * 1.2)
+    vy_range = (np.min(c.initial_vy) * 1.2, np.max(c.initial_vy) * 1.2)
+    ax_init_velocity.plot(
+        c.initial_vx,
+        c.initial_vy,
+        ".",
+        color="tab:cyan",
+        markersize=c.markersize,
+    )
+    ax_init_velocity.set_ylabel(r"$v_y$")
     ax_init_velocity.set_xlabel(r"$v_x$")
-    ax_init_velocity.set_ylabel(r"$f_0(v_x)$")
-    plt.xlim(c.x_range)
-    plt.title("Velocity")
+    ax_init_velocity.set_xlim(vx_range)
+    ax_init_velocity.set_ylim(vy_range)
+    plt.title("Initial velocity")
 
     # Plot initial positions in phase space
     ax_init_phase = fig1.add_subplot(2, 2, (3, 4))
@@ -299,20 +307,57 @@ def plot_traces(
     N = c.N
     x_hist = d.x_hist
     vx_hist = d.vx_hist
+    vy_hist = d.vy_hist
     x_range = c.x_range
     L = c.L
     x_min = c.x_min
+
+    # TODO: Make sure the history vectors are properly sized
+    last_frame = d.x_hist.shape[1]
+    for i in range(d.x_hist.shape[1]):
+        if (
+            np.sum(
+                np.abs(d.vx_hist[:, -(i + 1)]) + np.abs(d.x_hist[:, -(i + 1)])
+            )
+            > 10 ** -12
+        ):
+            last_frame = d.x_hist.shape[1] - i
+            break
+
     fig = plt.figure(figsize=(12, 8))
-    ax_xv = fig.add_subplot(211)
-    for i in range(N)[:: int(N / max_traces)]:
-        position = (x_hist[i, start_at_frame:] * L) + x_min
-        velocity = vx_hist[i, start_at_frame:] * L
-        ax_xv.plot(position, velocity, ".", markersize=1)
-        ax_xv.set_xlabel("x")
-        ax_xv.set_ylabel("v")
-        ax_xv.set_title(plot_title)
-        ax_xv.set_xlim(x_range)
-    ax_energy = fig.add_subplot(212)
+    ax_xv = fig.add_subplot(2, 2, 1)
+    if N <= max_traces:
+        for i in range(N):
+            position = (x_hist[i, start_at_frame:last_frame] * L) + x_min
+            velocity = vx_hist[i, start_at_frame:last_frame] * L
+            ax_xv.plot(position, velocity, ".", markersize=1)
+    else:
+        for i in range(N)[:: int(N / max_traces)]:
+            position = (x_hist[i, start_at_frame:last_frame] * L) + x_min
+            velocity = vx_hist[i, start_at_frame:last_frame] * L
+            ax_xv.plot(position, velocity, ".", markersize=1)
+    ax_xv.set_xlabel(r"$x$")
+    ax_xv.set_ylabel(r"$v_x$")
+    ax_xv.set_title(plot_title)
+    ax_xv.set_xlim(x_range)
+
+    ax_vv = fig.add_subplot(2, 2, 2)
+    if N <= max_traces:
+        for i in range(N):
+            vx = vx_hist[i, start_at_frame:last_frame] * L
+            vy = vy_hist[i, start_at_frame:last_frame] * L
+            ax_vv.plot(vx, vy, ".", markersize=1)
+    else:
+        for i in range(N)[:: int(N / max_traces)]:
+            vx = vx_hist[i, start_at_frame:last_frame] * L
+            vy = vy_hist[i, start_at_frame:last_frame] * L
+            ax_vv.plot(vx, vy, ".", markersize=1)
+    ax_vv.set_xlabel(r"$v_x$")
+    ax_vv.set_ylabel(r"$v_y$")
+    ax_vv.set_title(plot_title)
+    vx_range = (1.5 * np.min(d.vx_hist) * c.L, 1.5 * np.max(d.vx_hist) * c.L)
+    ax_vv.set_xlim(vx_range)
+    ax_energy = fig.add_subplot(2, 2, (3, 4))
     _plot_energy_ax(m, ax_energy)
     plt.tight_layout()
     save_plot(f"traces_{N}_particles.pdf")

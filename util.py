@@ -54,3 +54,9 @@ def save_data(data, filename):
     with open(path, "wb") as f:
         pickle.dump(data, f)
         print(f"Saved data to file {path}")
+
+
+def load_data(filename):
+    path = os.path.join(os.getcwd(), filename)
+    with open(path, "rb") as f:
+        return pickle.load(f)

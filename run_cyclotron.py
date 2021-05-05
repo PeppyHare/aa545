@@ -24,12 +24,12 @@ class CyclotronConfiguration(Configuration):
     wp = 1.0
     wc = 1.0
     dt = 0.05
-    n_periods = 80
+    n_periods = 2
     markersize = 10
     max_history_steps = 1000
 
     def set_initial_conditions(self):
-        self.initial_x = np.zeros(1)
+        self.initial_x = -1 * np.ones(1)
         self.initial_vx = np.zeros(1)
         self.initial_vy = np.ones(1)
 
@@ -38,6 +38,7 @@ c = CyclotronConfiguration()
 m = PicModel(c)
 m.run()
 d = m.d
-freq = count_crossings(d.ke_hist) / 4 / (c.n_periods / c.wp)
+freq = count_crossings(d.x_hist[0]) / 2 / (c.n_periods / c.wp)
 print(f"Measured frequency: {freq:.2f}, wc: {c.wc:.2f}")
-plots.animate_phase_space(m, plot_title="Cyclotron Motion", repeat=True)
+# plots.animate_phase_space(m, plot_title="Cyclotron Motion", repeat=True)
+plots.plot_traces(m, plot_title=r"Cyclotron Motion ($\omega_c = 1$)")

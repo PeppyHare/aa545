@@ -10,7 +10,7 @@ from model import PicModel
 from util import save_data
 import plots
 
-plt.style.use("dark_background")
+# plt.style.use("dark_background")
 
 
 class DGHConfiguration(Configuration):
@@ -51,7 +51,7 @@ class DGHConfiguration(Configuration):
     def set_initial_conditions(self):
         v0 = self.v0
         # Try to fill the ring distribution uniformly at each position
-        n_ring = 32  # Number of points per ring in vx/vy
+        n_ring = 128  # Number of points per ring in vx/vy
         n_x = int(self.N / n_ring)  # Number of positions to spread rings over
         self.initial_x = np.zeros(self.N)
         self.initial_vx = np.zeros(self.N)
@@ -61,7 +61,7 @@ class DGHConfiguration(Configuration):
             (self.x_max - self.x_min) / n_x / 2
         )
         theta = 2 * np.pi * np.arange(n_ring) / n_ring
-        init_positions += 0.00001 * np.cos(self.k * init_positions)
+        init_positions += 0.001 * np.cos(self.k * init_positions)
         for group in range(n_x):
             # Disrupt any correlation between x and theta
             # np.random.shuffle(theta)
@@ -72,12 +72,12 @@ class DGHConfiguration(Configuration):
             self.initial_vy[start_idx:end_idx] = v0 * np.sin(theta)
 
 
-def calc_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1):
+def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
     v0 = param * wc / k
     print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
     print("Setting up initial particle configuration.")
     c = DGHConfiguration(
-        v0=v0, n_periods=30, dt=0.05, k=k, M=256, N=8192, wp=wp, wc=wc
+        v0=v0, n_periods=n_periods, dt=0.005, k=k, M=128, N=16384, wp=wp, wc=wc
     )
     print("Initializing model and compiling subroutines.")
     m = PicModel(c)
@@ -95,13 +95,12 @@ def calc_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1):
     save_data(m, f"dgh_{param:.2f}.p")
 
 
-calc_dgh(4.1, k=1)
-
-# if __name__ == "__main__":
-#     param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
-#     with multiprocessing.Pool(
-#         min(len(param_trials), multiprocessing.cpu_count())
-#     ) as p:
-#         p.map(calc_dgh, param_trials)
-#         p.close()
-#     print("phew, that was some work!")
+if __name__ == "__main__":
+    run_dgh(6.1, k=1, n_periods=45)
+    # param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
+    # with multiprocessing.Pool(
+    #     min(len(param_trials), multiprocessing.cpu_count())
+    # ) as p:
+    #     p.map(run_dgh, param_trials)
+    #     p.close()
+    # print("phew, that was some work!")
