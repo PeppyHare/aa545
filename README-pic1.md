@@ -4,6 +4,7 @@
 
 Running the any of the `run_*.py` scripts requires a Python install (NumPy 1.20.2 supports either Python 3.7 or Python 3.8) with either `pip` or `poetry` for depdency installation.
 
+- `run_dgh.py` Initializes a cold ring distribution, demonstrating the Dory-Guest-Harris instability.
 - `run_langmuir_shm.py` Initializes a pair of stationary charged particles.
 - `run_two_beam_instability.py` Investigates the unstable behavior of two cold, counter-streaming beams of charged particles.
 - `run_leapfrog_instability.py` Performs an investigation into the leapfrog instability by violating the CFL condition.
