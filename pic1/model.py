@@ -1,6 +1,4 @@
-"""
-Coding project 1: Electrostatic Particle in Cell.
-"""
+"""Coding project 1: Electrostatic Particle in Cell."""
 import math
 
 import numba

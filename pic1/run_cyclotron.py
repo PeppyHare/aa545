@@ -40,5 +40,5 @@ m.run()
 d = m.d
 freq = count_crossings(d.x_hist[0]) / 2 / (c.n_periods / c.wp)
 print(f"Measured frequency: {freq:.2f}, wc: {c.wc:.2f}")
-# plots.animate_phase_space(m, plot_title="Cyclotron Motion", repeat=True)
+plots.animate_phase_space(m, plot_title="Cyclotron Motion", repeat=True)
 plots.plot_traces(m, plot_title=r"Cyclotron Motion ($\omega_c = 1$)")
