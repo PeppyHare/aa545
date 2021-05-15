@@ -156,6 +156,76 @@ def plot_initial_distribution(m: PicModel, hold=True):
         plt.show()  # Waits for user to close the plot
 
 
+def plot_snapshots_velocity_phase_space(
+    m: PicModel,
+    snapshot_times: list = [],
+    hold: bool = True,
+    plot_title: str = "Time snapshots",
+    filename: str = "snapshots_velocity_phase_space.pdf",
+):
+    print("Generating snapshots of state at various time intervals.")
+    c = m.c
+    d = m.d
+    if not m.has_run:
+        m.run()
+    t_max = c.t_max
+    if not snapshot_times:
+        snapshot_times = [0, 0.25 * t_max, 0.5 * t_max, 0.75 * t_max, t_max]
+    dt = c.dt
+    t_steps = c.t_steps
+    L = c.L
+    x_min = c.x_min
+    x_range = c.x_range
+    subsample_ratio = c.subsample_ratio
+    vx_hist = d.vx_hist
+    vy_hist = d.vy_hist
+    snapshot_times.sort()
+    snapshot_frames = [math.floor(t / dt) for t in snapshot_times]
+    snapshots = []
+    for frame in range(t_steps):
+        if frame in snapshot_frames:
+            snapshots.append(
+                {
+                    "vx": vx_hist[:, int(frame / subsample_ratio)],
+                    "vy": vy_hist[:, int(frame / subsample_ratio)],
+                    "frame": frame,
+                }
+            )
+    print(f"Sampled {len(snapshots)} snapshots over {t_steps} time steps.")
+    fig = plt.figure(figsize=(6, 8))
+    fig.suptitle(plot_title)
+    num_subplots = len(snapshots)
+    idx = 1
+    n2 = math.ceil(c.N / 2)
+    for snapshot in snapshots:
+        ax_xv = fig.add_subplot(num_subplots, 1, idx)
+        cur_t = snapshot["frame"] * dt
+        ax_xv.set_ylabel(r"$v_y$")
+        ax_xv.set_title(f"t={cur_t:.2f}")
+        plt.plot(
+            (snapshot["vx"][:n2] * L),
+            (snapshot["vy"][:n2] * L),
+            ".",
+            color="tab:orange",
+            markersize=1,
+        )
+        plt.plot(
+            (snapshot["vx"][n2:] * L),
+            (snapshot["vy"][n2:] * L),
+            ".",
+            color="tab:cyan",
+            markersize=1,
+        )
+
+        if idx == num_subplots:
+            ax_xv.set_xlabel("$v_x$")
+        idx += 1
+    plt.tight_layout()
+    save_plot(filename)
+    if hold:
+        plt.show()  # Waits for user to close the plots
+
+
 def plot_snapshots_velocity(
     m: PicModel,
     snapshot_times: list = [],

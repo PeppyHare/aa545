@@ -1,6 +1,4 @@
 """Dory-Guest-Harris Instability."""
-import multiprocessing
-import random
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -10,7 +8,7 @@ from model import PicModel
 from util import save_data
 import plots
 
-# plt.style.use("dark_background")
+plt.style.use("dark_background")
 
 
 class DGHConfiguration(Configuration):
@@ -73,15 +71,19 @@ class DGHConfiguration(Configuration):
 
 
 def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
+    """Run the PIC code with a cold ring distribution initialized.
+
+    The :param: parameter is k*v/wc, which determines the stability of the
+    solutions."""
     v0 = param * wc / k
     print(f"k: {k}, wc: {wc:.4f}, v0: {v0:.4f}, wp: {wp:.4f}")
     print("Setting up initial particle configuration.")
     c = DGHConfiguration(
-        v0=v0, n_periods=n_periods, dt=0.1, k=k, M=64, N=8192, wp=wp, wc=wc
+        v0=v0, n_periods=n_periods, dt=0.003, k=k, M=64, N=8192, wp=wp, wc=wc
     )
     print("Initializing model and compiling subroutines.")
     m = PicModel(c)
-    # plots.plot_initial_distribution(m)
+    plots.plot_initial_distribution(m)
     print(f"Time steps: {c.t_steps}")
     m.run()
     plots.animate_phase_space(
@@ -93,15 +95,8 @@ def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
         hold=True,
     )
     # Save the data!
-    save_data(m, f"dgh_{param:.2f}.p")
+    save_data(m, f"dgh_{param:.2f}_big.p")
 
 
 if __name__ == "__main__":
-    run_dgh(4.5, k=1, n_periods=30)
-    # param_trials = [4.1, 4.5, 5.0, 5.6, 6.0, 6.6]
-    # with multiprocessing.Pool(
-    #     min(len(param_trials), multiprocessing.cpu_count())
-    # ) as p:
-    #     p.map(run_dgh, param_trials)
-    #     p.close()
-    # print("phew, that was some work!")
+    run_dgh(5.5, k=1, n_periods=20)
