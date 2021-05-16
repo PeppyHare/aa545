@@ -7,11 +7,10 @@ import math
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import HTMLWriter
-import mpld3
 import numpy as np
 
-from fd1.models import AdvectionModel
-from fd1.utils import save_plot, create_folder
+from models import AdvectionModel
+from utils import save_plot, create_folder
 
 
 def plot_initial_distribution(m: AdvectionModel, hold=True):

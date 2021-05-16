@@ -3,8 +3,8 @@ import numba
 import numpy as np
 import progressbar
 
-from fd1.configuration import Configuration, ParticleData
-from fd1.methods import exact_advection_periodic
+from configuration import Configuration, ParticleData
+from methods import exact_advection_periodic
 
 
 class AdvectionModel:

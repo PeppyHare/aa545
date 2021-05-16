@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from fd1.methods import time_step_ftcs_dirichlet
+from methods import time_step_ftcs_dirichlet
 
 
 class Configuration:

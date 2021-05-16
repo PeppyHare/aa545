@@ -4,9 +4,9 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import math
 
-from fd1.configuration import Configuration
-from fd1.models import AdvectionModel
-from fd1.methods import (
+from configuration import Configuration
+from models import AdvectionModel
+from methods import (
     exact_advection_dirichlet,
     exact_advection_periodic,
     time_step_ftcs_dirichlet,
@@ -15,8 +15,8 @@ from fd1.methods import (
     time_step_simple_upwind_dirichlet,
     time_step_ftcs_periodic,
 )
-import fd1.plots as plots
-from fd1.utils import save_plot
+import plots as plots
+from utils import save_plot
 
 
 # plt.style.use("dark_background")

@@ -7,7 +7,6 @@ import math
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import HTMLWriter
-import mpld3
 import numpy as np
 
 from fd1.models import AdvectionModel
