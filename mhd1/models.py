@@ -1,18 +1,14 @@
-"""Coding project 2: Finite Difference Integrator."""
+"""Coding project 2: Ideal MHD."""
 import numba
 import numpy as np
 import progressbar
+import tables
 
-from fd1.configuration import Configuration, ParticleData
-from fd1.methods import exact_advection_periodic
+from mhd1.configuration import Configuration, ParticleData
 
 
-class AdvectionModel:
-    """Finite difference solver for the 1D advection equation.
-
-    For the simple model equation, the exact solution is known, so we can
-    compute the error at each time step.
-    """
+class MHDModel:
+    """Attempt to solve a system under the equations of ideal MHD."""
 
     has_run = False
 
@@ -20,6 +16,33 @@ class AdvectionModel:
         """Initialize model."""
         self.c = c
         self.d = ParticleData(c)
+
+    def write_out_data(self, Q):
+        with tables.open_file(self.d.h5_filename, mode="a") as f:
+            f.root.rho.append(
+                Q[0, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.mx.append(
+                Q[1, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.my.append(
+                Q[2, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.mz.append(
+                Q[3, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.bx.append(
+                Q[4, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.by.append(
+                Q[5, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.bz.append(
+                Q[6, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
+            f.root.e.append(
+                Q[7, :, :, :].reshape((1, self.c.Mx, self.c.My, self.c.Mz))
+            )
 
     def run(self, showprogress=True):
         """Run the simulation."""
@@ -38,26 +61,20 @@ class AdvectionModel:
             bar.start()
         time_step_method = c.time_step_method
         for n in numba.prange(c.t_steps):
-            exact_advection_periodic(
-                u_j=d.u_exact,
-                u_hist=d.u_exact_hist,
-                n=n,
-                subsample_ratio=c.subsample_ratio,
-                dx=c.dx,
-                dt=c.dt,
-                c=c.c,
-            )
             time_step_method(
-                u_j=d.u_j,
-                u_hist=d.u_hist,
-                n=n,
-                subsample_ratio=c.subsample_ratio,
+                Q=d.Q,
                 dx=c.dx,
+                dy=c.dy,
+                dz=c.dz,
                 dt=c.dt,
-                c=c.c,
+                gamma=c.gamma,
+                mu=c.mu,
+                bcx=c.bcx,
+                bcy=c.bcy,
+                bcz=c.bcz,
             )
-            d.err[n] += np.sum((d.u_j - d.u_exact) ** 2)
-            d.u_max[n] += np.max(np.abs(d.u_j))
+            if n % c.subsample_ratio == 0 and n > 0:
+                self.write_out_data(d.Q)
 
             if showprogress:
                 bar.update(n)

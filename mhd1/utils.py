@@ -15,8 +15,8 @@ def create_folder(path):
 
 
 def save_plot(filename):
-    create_folder(os.path.join(os.getcwd(), "plots", "fd1"))
-    fig_name = os.path.join("plots", "fd1", filename)
+    create_folder(os.path.join(os.getcwd(), "plots", "mhd1"))
+    fig_name = os.path.join("plots", "mhd1", filename)
     plt.savefig(fig_name)
     print(f"Saved figure {os.path.join(os.getcwd(), fig_name)} to disk.")
 
@@ -44,11 +44,11 @@ def save_data(data, filename):
             hour=0, minute=0, second=0, microsecond=0
         )
     ).total_seconds()
-    create_folder(os.path.join(os.getcwd(), "saved_data", "fd1"))
+    create_folder(os.path.join(os.getcwd(), "saved_data", "mhd1"))
     path = os.path.join(
         os.getcwd(),
         "saved_data",
-        "fd1",
+        "mhd1",
         f"{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}_{filename}",
     )
     with open(path, "wb") as f:

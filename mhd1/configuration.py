@@ -1,8 +1,12 @@
+import datetime
+import os
 import math
 
 import numpy as np
+import tables
 
-from fd1.methods import time_step_ftcs_dirichlet
+from mhd1.methods import maccormack_time_step
+from mhd1.utils import create_folder
 
 
 class Configuration:
@@ -13,13 +17,13 @@ class Configuration:
     """
 
     # Number of grid points in x
-    Mx = 201
+    Mx = 65
 
     # Number of grid points in y
-    My = 201
+    My = 65
 
     # Number of grid points in z
-    Mz = 201
+    Mz = 65
 
     # Left-hand boundary of domain
     x_min = 0
@@ -34,21 +38,30 @@ class Configuration:
     # Time step
     dt = 0.5
 
-    # Adiabatic index gamma
-    g = 5/3
+    # Adiabatic index
+    gamma = 5 / 3
+
+    # Vacuum permeability
+    mu = 1
 
     # Max time
     t_max = 100
 
+    # Boundary condition types in each direction
+    # 0: periodic boundary
+    bcx = 0
+    bcy = 0
+    bcz = 0
+
     # Integration method
-    time_step_method = staticmethod(time_step_ftcs_dirichlet)
+    time_step_method = staticmethod(maccormack_time_step)
 
     # Max number of time steps to hold in memory.
     # If t_steps greater than this, subsampling will occur.
-    max_history_steps = 5000
+    max_history_steps = 32
 
     def __init__(self):
-        """Return a valid configuration for AdvectionModel."""
+        """Return a valid configuration for MHDModel."""
         # Grid points
         self.x_i = np.linspace(self.x_min, self.x_max, self.Mx)
         self.y_j = np.linspace(self.y_min, self.y_max, self.My)
@@ -75,12 +88,29 @@ class Configuration:
         self.set_initial_conditions()
 
     def set_initial_conditions(self):
-        """Set the initial conditions to be evolved in time."""
-        # Default: Square pulse
-        
-        u = np.zeros(self.M)
-        u[10:21] = 1
-        self.initial_u = u
+        """Set the initial conditions to be evolved in time.
+
+        The conserved variables q are stored at each grid point (i, j, k):
+
+        Q[0] = rho
+        Q[1] = rho*vx
+        Q[2] = rho*vy
+        Q[3] = rho*vz
+        Q[4] = Bx
+        Q[5] = By
+        Q[6] = Bz
+        Q[7] = e
+
+        Default initial configuration: constant
+
+        TODO: cylindrical screw pinch with axial current distribution and
+        uniform axial magnetic field.
+        """
+        Q = np.zeros((8, self.Mx, self.My, self.Mz))
+        Q[0, :, :, :] = 0.1 + 0.1 * np.sin(self.x_i)
+        Q[1, 20:30, :, :] = 1
+        Q[6, :, :, :] = 1
+        self.initial_Q = Q
 
 
 class ParticleData:
@@ -93,19 +123,86 @@ class ParticleData:
     def __init__(self, c: Configuration):
         """Initialize ParticleData."""
         # The current solution state at each grid point
-        self.u_j = np.zeros_like(c.initial_u)
-        self.u_j += c.initial_u
-        self.u_exact = np.zeros_like(c.initial_u)
-        self.u_exact += c.initial_u
+        self.Q = np.copy(c.initial_Q)
 
-        # Store the history of the solution over time
-        self.u_hist = np.zeros((c.M, c.max_history_steps))
-        self.u_hist[:, 0] += c.initial_u
-        self.u_exact_hist = np.zeros((c.M, c.max_history_steps))
-        self.u_exact_hist[:, 0] += c.initial_u
-
-        # Solution error
-        self.err = np.zeros(c.t_steps)
-
-        # Store the max value of u
-        self.u_max = np.zeros(c.t_steps)
+        # Store the history of the solution over time in a pytables dataset
+        create_folder(os.path.join(os.getcwd(), "saved_data", "mhd1"))
+        now_seconds = (
+            datetime.datetime.now()
+            - datetime.datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+        ).total_seconds()
+        self.h5_filename = os.path.join(
+            os.getcwd(),
+            "saved_data",
+            "mhd1",
+            f"{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}_data.h5",
+        )
+        max_snapshots = min(c.max_history_steps, c.t_steps)
+        with tables.open_file(self.h5_filename, "w") as f:
+            atom = tables.Float64Atom()
+            q0 = f.create_earray(
+                f.root,
+                "rho",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q0.append(c.initial_Q[0, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q1 = f.create_earray(
+                f.root,
+                "mx",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q1.append(c.initial_Q[1, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q2 = f.create_earray(
+                f.root,
+                "my",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q2.append(c.initial_Q[2, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q3 = f.create_earray(
+                f.root,
+                "mz",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q3.append(c.initial_Q[3, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q4 = f.create_earray(
+                f.root,
+                "bx",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q4.append(c.initial_Q[4, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q5 = f.create_earray(
+                f.root,
+                "by",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q5.append(c.initial_Q[5, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q6 = f.create_earray(
+                f.root,
+                "bz",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q6.append(c.initial_Q[6, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))
+            q7 = f.create_earray(
+                f.root,
+                "e",
+                atom,
+                (0, c.Mx, c.My, c.Mz),
+                expectedrows=max_snapshots,
+            )
+            q7.append(c.initial_Q[7, :, :, :].reshape((1, c.Mx, c.My, c.Mz)))

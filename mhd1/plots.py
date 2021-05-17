@@ -9,218 +9,99 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.animation import HTMLWriter
 import numpy as np
 
-from fd1.models import AdvectionModel
-from fd1.utils import save_plot, create_folder
+from mhd1.models import MHDModel
+from mhd1.utils import save_plot, create_folder
 
 
-def plot_initial_distribution(m: AdvectionModel, hold=True):
+def plot_initial_distribution(m: MHDModel):
     """Plot initial configuration using pyplot."""
     c = m.c
+    fig = plt.figure(figsize=(10, 10))
+    fig.suptitle("Initial distribution")
 
-    fig1 = plt.figure(figsize=(6, 8))
-    fig1.suptitle(f"Initial distribution (M={c.M})")
-    x_j = c.x_j
-    initial_u = c.initial_u
+    x = c.x_i
+    y = c.y_j
+    z = c.z_k
+    i2 = int(c.Mx / 2)
+    j2 = int(c.My / 2)
+    k2 = int(c.Mz / 2)
 
-    # Plot initial weighted particle positions on the grid
-    ax_init_u = fig1.add_subplot(111)
-    (pt_rho,) = ax_init_u.plot(
-        x_j, initial_u, "-", color="tab:orange", label=r"$u(x, t=0)$"
-    )
-    ax_init_u.set_xlabel(r"$x$")
-    ax_init_u.set_ylabel(r"$u$")
-    plt.xlim((x_j[0], x_j[-1]))
-    plt.title("Initial distribution")
+    # Plot initial density distribution
+    ax_rho_xy = fig.add_subplot(331)
+    X, Y = np.meshgrid(x, y)
+    Z = c.initial_Q[0, :, :, k2]
+    ct = ax_rho_xy.contourf(X, Y, Z)
+    ax_rho_xy.set_ylabel(r"$y$")
+    ax_rho_xy.set_xlabel(r"$x$")
+    plt.colorbar(ct, ax=ax_rho_xy)
+
+    ax_rho_xz = fig.add_subplot(332)
+    X, Y = np.meshgrid(x, z)
+    Z = c.initial_Q[0, :, j2, :]
+    ct = ax_rho_xz.contourf(X, Y, Z)
+    ax_rho_xz.set_ylabel(r"$z$")
+    ax_rho_xz.set_xlabel(r"$x$")
+    plt.colorbar(ct, ax=ax_rho_xz)
+    ax_rho_xz.set_title("Initial density")
+
+    ax_rho_yz = fig.add_subplot(333)
+    X, Y = np.meshgrid(y, z)
+    Z = c.initial_Q[0, i2, :, :]
+    ct = ax_rho_xz.contourf(X, Y, Z)
+    ax_rho_yz.set_ylabel(r"$z$")
+    ax_rho_yz.set_xlabel(r"$y$")
+    plt.colorbar(ct, ax=ax_rho_yz)
+
+    # Plot initial current distribution
+    ax_p_xy = fig.add_subplot(334)
+    X, Y = np.meshgrid(x, y)
+    U = c.initial_Q[1, :, :, k2]
+    V = c.initial_Q[2, :, :, k2]
+    ax_p_xy.quiver(X, Y, U, V)
+    ax_p_xy.set_xlabel(r"$x$")
+    ax_p_xy.set_ylabel(r"$y$")
+
+    ax_p_yz = fig.add_subplot(335)
+    X, Y = np.meshgrid(y, z)
+    U = c.initial_Q[2, i2, :, :]
+    V = c.initial_Q[3, i2, :, :]
+    ax_p_yz.streamplot(X, Y, U, V)
+    ax_p_yz.set_xlabel(r"$y$")
+    ax_p_yz.set_ylabel(r"$z$")
+    ax_p_yz.set_title(r"Momentum")
+
+    ax_p_xz = fig.add_subplot(336)
+    X, Y = np.meshgrid(x, z)
+    U = c.initial_Q[1, :, j2, :]
+    V = c.initial_Q[3, :, j2, :]
+    ax_p_xz.streamplot(X, Y, U, V)
+    ax_p_xz.set_xlabel(r"$x$")
+    ax_p_xz.set_ylabel(r"$z$")
+
+    # Plot direction of initial magnetic field
+    ax_b_xy = fig.add_subplot(337)
+    X, Y = np.meshgrid(x, y)
+    U = c.initial_Q[4, :, :, k2]
+    V = c.initial_Q[5, :, :, k2]
+    ax_b_xy.quiver(X, Y, U, V)
+    ax_b_xy.set_xlabel(r"$x$")
+    ax_b_xy.set_ylabel(r"$y$")
+
+    ax_b_yz = fig.add_subplot(338)
+    X, Y = np.meshgrid(y, z)
+    U = c.initial_Q[5, i2, :, :]
+    V = c.initial_Q[6, i2, :, :]
+    ax_b_yz.streamplot(X, Y, U, V)
+    ax_b_yz.set_xlabel(r"$y$")
+    ax_b_yz.set_ylabel(r"$z$")
+    ax_b_yz.set_title(r"$B_y$, $B_z$")
+
+    ax_b_xz = fig.add_subplot(339)
+    X, Y = np.meshgrid(x, z)
+    U = c.initial_Q[4, :, j2, :]
+    V = c.initial_Q[6, :, j2, :]
+    ax_b_xz.streamplot(X, Y, U, V)
+    ax_b_xz.set_xlabel(r"$x$")
+    ax_b_xz.set_ylabel(r"$z$")
     plt.tight_layout()
-    save_plot(f"initial_u_{c.M}_grid.pdf")
-    if hold:
-        plt.show()  # Waits for user to close the plot
-
-
-def plot_snapshots(
-    m: AdvectionModel,
-    snapshot_times: list = [],
-    hold: bool = True,
-    plot_title: str = "Time snapshots",
-    filename: str = "snapshots.pdf",
-):
-    print("Generating snapshots of state at various time intervals.")
-    c = m.c
-    d = m.d
-    if not m.has_run:
-        m.run()
-    t_max = c.t_max
-    if not snapshot_times:
-        snapshot_times = [0, 0.5 * t_max, 0.99 * t_max]
-    dt = c.dt
-    t_steps = c.t_steps
-    x_range = (c.x_min, c.x_max)
-    subsample_ratio = c.subsample_ratio
-    snapshot_times.sort()
-    snapshot_frames = [int(math.floor(t / dt)) for t in snapshot_times]
-    snapshots = []
-    for frame in range(t_steps):
-        if frame in snapshot_frames:
-            snapshots.append(
-                {
-                    "u": d.u_hist[:, int(frame / subsample_ratio)],
-                    "u_exact": d.u_exact_hist[:, int(frame / subsample_ratio)],
-                    "frame": frame,
-                }
-            )
-    print(f"Sampled {len(snapshots)} snapshots over {t_steps} time steps.")
-    fig = plt.figure(figsize=(6, 3))
-    fig.suptitle(plot_title)
-    num_subplots = len(snapshots)
-    idx = 1
-    for snapshot in snapshots:
-        ax_xv = fig.add_subplot(num_subplots, 1, idx)
-        cur_t = snapshot["frame"] * dt
-        ax_xv.set_ylabel(r"$u$")
-        ax_xv.set_title(f"t={cur_t:.2f}")
-        plt.plot(
-            c.x_j,
-            snapshot["u"],
-            "-",
-            color="tab:orange",
-            markersize=1,
-            label="Finite difference",
-        )
-        plt.plot(
-            c.x_j,
-            snapshot["u_exact"],
-            "-",
-            color="tab:cyan",
-            markersize=1,
-            label="Exact solution",
-        )
-
-        plt.xlim(x_range)
-        if idx == num_subplots:
-            ax_xv.set_xlabel("x")
-        idx += 1
-    plt.legend()
-    plt.tight_layout()
-    save_plot(filename)
-    if hold:
-        plt.show()  # Waits for user to close the plots
-
-
-def _animate_frame(
-    frame,
-    u_hist,
-    u_exact_hist,
-    x_j,
-    pt_xu,
-    pt_xu_ex,
-    time_text,
-    # vline_t,
-    subsample_ratio,
-    dt,
-):
-    current_time = frame * dt * subsample_ratio
-    time_text.set_text(f"t = {current_time:.2f}")
-    # vline_t.set_xdata([current_time, current_time])
-    pt_xu.set_data(x_j, u_hist[:, frame])
-    pt_xu_ex.set_data(x_j, u_exact_hist[:, frame])
-    return (pt_xu, pt_xu_ex, time_text)
-
-
-def animate_fd(
-    m: AdvectionModel,
-    plot_title="Animation",
-    plot_label=None,
-    repeat: bool = False,
-    hold: bool = True,
-    savefig: bool = False,
-):
-    """Generate an animation of the solution at all grid points space over time.
-
-    Important Note: Using savefig=True will save a .mp4 of the animation to disk,
-    but requires ffmpeg to be installed and accessible on the $PATH.
-    """
-    if not m.has_run:
-        m.run()
-    if not plot_label:
-        plot_label = "Difference method"
-    c = m.c
-    d = m.d
-    x_j = c.x_j
-
-    fig = plt.figure(figsize=(6, 6))
-    fig.suptitle(plot_title)
-    ax_xu = plt.subplot2grid((1, 1), (0, 0), colspan=1, rowspan=1)
-    ax_xu.set_title("Advection animation")
-    ax_xu.set_ylabel("u")
-    ax_xu.set_xlabel("x")
-    ax_xu.set_xlim((x_j[0], x_j[-1]))
-    u_range = (np.min(d.u_hist) * 1.2, np.max(d.u_hist) * 1.2)
-    ax_xu.set_ylim(u_range)
-
-    # vline_t = ax_energy.axvline(0, ls="--", color="darkgray", zorder=10)
-
-    (pt_xu,) = ax_xu.plot([], [], "-", color="tab:orange", label=plot_label)
-
-    (pt_xu_ex,) = ax_xu.plot(
-        [], [], "-", color="tab:cyan", label="Exact Solution"
-    )
-    plt.legend()
-
-    # Add a label to the frame showing the current time. Updated each time step
-    # in update()
-    time_text = ax_xu.text(0.02, 0.95, "", transform=ax_xu.transAxes)
-    animate = partial(
-        _animate_frame,
-        u_hist=d.u_hist,
-        u_exact_hist=d.u_exact_hist,
-        x_j=x_j,
-        pt_xu=pt_xu,
-        pt_xu_ex=pt_xu_ex,
-        time_text=time_text,
-        # vline_t,
-        subsample_ratio=c.subsample_ratio,
-        dt=c.dt,
-    )
-
-    # TODO: Make sure the history vectors are properly sized
-    last_frame = d.u_hist.shape[1]
-    for i in range(d.u_hist.shape[1]):
-        if np.sum(np.abs(d.u_hist[:, -(i + 1)])) > 10 ** -12:
-            last_frame = d.u_hist.shape[1] - i
-            break
-
-    # Evolve positions until t_max. Animate particle positions in phase space.
-    animation = FuncAnimation(
-        fig,
-        animate,
-        frames=range(last_frame),
-        blit=True,
-        interval=5,
-        repeat=repeat,
-    )
-    plt.tight_layout()
-    if hold:
-        plt.show()  # Waits for user to close the plot
-    if savefig:
-        create_folder(os.path.join(os.getcwd(), "plots", "fd1"))
-        now_seconds = (
-            datetime.datetime.now()
-            - datetime.datetime.now().replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-        ).total_seconds()
-        animation_name = os.path.join(
-            "plots",
-            "fd1",
-            f"animation_{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}.mp4",
-        )
-        
-        animation.save(
-            animation_name,
-            fps=int(last_frame / 15),  # 15 second animation
-            dpi="figure",
-            progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
-        )
-        plt.close(fig)
-        print(f"Saved animation {animation_name} to disk.")
-    return animation
+    plt.show()
