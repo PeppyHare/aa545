@@ -1,11 +1,13 @@
 """Coding project 2: Ideal MHD."""
+import time
+
 import numba
 import numpy as np
 import progressbar
 import tables
 
 from mhd1.configuration import Configuration, ParticleData
-from mhd1.methods import divB
+from mhd1.methods import divB, calc_cfl
 
 
 class MHDModel:
@@ -62,20 +64,27 @@ class MHDModel:
             )
             bar.start()
         time_step_method = c.time_step_method
+        start_time = time.perf_counter()
         for n in numba.prange(c.t_steps):
-            if np.min(d.Q[0]) < 10 ** -6:
-                raise Exception(f"Density {np.min(d.Q[0])} is too small!")
+            # Check for density positivity
+            if np.min(d.Q[0]) < 10 ** -12:
+                print(f"Density {np.min(d.Q[0])} is too small!")
+                break
+            # Check for CFL condition
+            (cfl_x, cfl_y, cfl_z) = calc_cfl(d.Q, c.dx, c.dy, c.dz, c.dt)
+            print(
+                f"Current CFL numbers: Cx={cfl_x:.3f}, Cy={cfl_y:.3f},"
+                f" Cz={cfl_z:.3f}"
+            )
+            if cfl_x >= 1 or cfl_y >= 1 or cfl_z >= 1:
+                print("CFL condition violated!")
+                break
             time_step_method(
                 Q=d.Q,
                 dx=c.dx,
                 dy=c.dy,
                 dz=c.dz,
                 dt=c.dt,
-                gamma=c.gamma,
-                mu=c.mu,
-                bcx=c.bcx,
-                bcy=c.bcy,
-                bcz=c.bcz,
             )
             if n % c.subsample_ratio == 0 and n > 0:
                 self.write_out_data(d.Q)
@@ -104,10 +113,14 @@ class MHDModel:
                         )
                     )
                 )
-                print(f"max_divB: {self.d.max_divB[n]}")
+                # print(f"max_divB: {self.d.max_divB[n]}")
             if showprogress:
                 bar.update(n)
         if showprogress:
             bar.finish()
-        print(f"Done! Timeseries data saved to {self.d.h5_filename}")
+        end_time = time.perf_counter()
+        print(
+            f"Done! Took {10**-6 * (end_time - start_time):.2f}ms. Timeseries"
+            f" data saved to {self.d.h5_filename}"
+        )
         self.has_run = True

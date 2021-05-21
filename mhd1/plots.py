@@ -280,6 +280,111 @@ def plot_initial_distribution_xy(m: MHDModel):
 # plt.show()
 
 
+def plot_shock(m: MHDModel):
+    c = m.c
+    d = m.d
+    fig, ((ax_rho, ax_t), (ax_u, ax_v), (ax_by, ax_e)) = plt.subplots(
+        ncols=2, nrows=3, constrained_layout=True, figsize=(6, 8)
+    )
+    ax_rho.set_title(r"$\rho$")
+    ax_u.set_title(r"$\rho v_x$")
+    ax_v.set_title(r"$\rho v_y$")
+    ax_by.set_title(r"$B_y$")
+    ax_e.set_title(r"$e$")
+    ax_rho.set_xlabel(r"$x$")
+    ax_u.set_xlabel(r"$x$")
+    ax_v.set_xlabel(r"$x$")
+    ax_by.set_xlabel(r"$x$")
+    ax_e.set_xlabel(r"$x$")
+    x = c.x_i
+    with tables.open_file(d.h5_filename, mode="r") as f:
+        j0 = int((f.root.rho.shape[2] - 1) / 2)
+        k0 = int((f.root.rho.shape[3] - 1) / 2)
+        (pt_rho,) = ax_rho.plot(
+            x, f.root.rho[0, :, j0, k0], color="tab:green", animated=True
+        )
+        (pt_u,) = ax_u.plot(
+            x,
+            f.root.mx[0, :, j0, k0] / f.root.rho[0, :, j0, k0],
+            color="tab:orange",
+            animated=True,
+        )
+        (pt_v,) = ax_v.plot(
+            x,
+            f.root.my[0, :, j0, k0] / f.root.rho[0, :, j0, k0],
+            color="tab:cyan",
+            animated=True,
+        )
+        (pt_by,) = ax_by.plot(
+            x, f.root.by[0, :, j0, k0], color="tab:purple", animated=True
+        )
+        (pt_e,) = ax_e.plot(
+            x, f.root.e[0, :, j0, k0], color="tab:red", animated=True
+        )
+        time_text = ax_t.text(0.5, 0.5, "", transform=ax_t.transAxes)
+
+        rho = f.root.rho[:, :, j0, k0]
+        u = f.root.mx[:, :, j0, k0] / f.root.rho[:, :, j0, k0]
+        v = f.root.my[:, :, j0, k0] / f.root.rho[:, :, j0, k0]
+        by = f.root.by[:, :, j0, k0]
+        e = f.root.e[:, :, j0, k0]
+
+    ax_rho.set_ylim(np.min(rho), np.max(rho))
+    ax_u.set_ylim(np.min(u), np.max(u))
+    ax_v.set_ylim(np.min(v), np.max(v))
+    ax_by.set_ylim(np.min(by), np.max(by))
+    ax_e.set_ylim(np.min(e), np.max(e))
+
+    dt = c.dt
+    subsample_ratio = c.subsample_ratio
+
+    def animate(n):
+        current_time = n * dt * subsample_ratio
+        time_text.set_text(f"t = {current_time:.2f}")
+        pt_rho.set_data(x, rho[n])
+        pt_u.set_data(x, u[n])
+        pt_v.set_data(x, v[n])
+        pt_by.set_data(x, by[n])
+        pt_e.set_data(x, e[n])
+        return (pt_rho, pt_u, pt_v, pt_by, pt_e, time_text)
+
+        # for n in range(f.root.rho.shape[0]):
+        #     # for n in range(0, 2):
+
+        #     (pt_rho,) = ax_rho.plot(
+        #         f.root.rho[n, :, j0, k0], color="tab:green", animated=True
+        #     )
+        #     (pt_u,) = ax_u.plot(
+        #         f.root.mx[n, :, j0, k0], color="tab:orange", animated=True
+        #     )
+        #     (pt_v,) = ax_v.plot(
+        #         f.root.my[n, :, j0, k0], color="tab:cyan", animated=True
+        #     )
+        #     (pt_by,) = ax_by.plot(
+        #         f.root.by[n, :, j0, k0], color="tab:purple", animated=True
+        #     )
+        #     (pt_e,) = ax_e.plot(
+        #         f.root.e[n, :, j0, k0], color="tab:red", animated=True
+        #     )
+        #     frames.append([pt_rho, pt_u, pt_v, pt_by, pt_e])
+
+    ani = animation.FuncAnimation(
+        fig,
+        animate,
+        frames=rho.shape[0],
+        blit=True,
+        interval=20,
+        repeat=True,
+    )
+    # ani = animation.ArtistAnimation(
+    #     fig,
+    #     frames,
+    #     interval=20,
+    #     blit=True,
+    # )
+    plt.show()
+
+
 def animate_mhd(m: MHDModel, plot_title="Animation", repeat: bool = True):
     """Animate the distribution over time, viewed from two orthogonal slices."""
     if not m.has_run:
@@ -346,60 +451,62 @@ def animate_mhd(m: MHDModel, plot_title="Animation", repeat: bool = True):
     i0 = int(c.Mx / 2)  # midplane of the x-axis
     k0 = int(c.Mz / 2)  # midplane of the z-axis
     with tables.open_file(d.h5_filename, mode="r") as f:
-    #     rho_xy = f.root.rho[:, :, :, k0]
-    #     rho_yz = f.root.rho[:, i0, :, :]
-    #     e_xy = f.root.e[:, :, :, k0]
-    #     e_yz = f.root.e[:, i0, :, :]
-    #     bx_xy = f.root.bx[:, :, :, k0]
-    #     bx_yz = f.root.bx[:, i0, :, :]
-    #     by_xy = f.root.by[:, :, :, k0]
-    #     by_yz = f.root.by[:, i0, :, :]
-    #     bz_xy = f.root.bz[:, :, :, k0]
-    #     bz_yz = f.root.bz[:, i0, :, :]
-    #     vx_xy = f.root.mx[:, :, :, k0]
-    #     vx_yz = f.root.mx[:, i0, :, :]
-    #     vy_xy = f.root.my[:, :, :, k0]
-    #     vy_yz = f.root.my[:, i0, :, :]
-    #     vz_xy = f.root.mz[:, :, :, k0]
-    #     vz_yz = f.root.mz[:, i0, :, :]
-    #     frames = [
-    #         rho_xy,
-    #         rho_yz,
-    #         e_xy,
-    #         e_yz,
-    #         vx_xy,
-    #         vx_yz,
-    #         vy_xy,
-    #         vy_yz,
-    #         vz_xy,
-    #         vz_yz,
-    #         bx_xy,
-    #         bx_yz,
-    #         by_xy,
-    #         by_yz,
-    #         bz_xy,
-    #         bz_yz,
-    #     ]
-    # im_rho_xy = ax_rho_xy.imshow(frames[0][0], origin="lower")
-    # im_rho_yz = ax_rho_yz.imshow(frames[1][0], origin="lower")
-    # cb_rho = fig.colorbar(im_rho_yz, ax=[ax_rho_xy, ax_rho_yz])
-    # im_e_xy = ax_e_xy.imshow(frames[2][0], origin="lower")
-    # im_e_yz = ax_e_yz.imshow(frames[3][0], origin="lower")
-    # cb_e = fig.colorbar(im_e_yz, ax=[ax_e_xy, ax_e_yz])
+        #     rho_xy = f.root.rho[:, :, :, k0]
+        #     rho_yz = f.root.rho[:, i0, :, :]
+        #     e_xy = f.root.e[:, :, :, k0]
+        #     e_yz = f.root.e[:, i0, :, :]
+        #     bx_xy = f.root.bx[:, :, :, k0]
+        #     bx_yz = f.root.bx[:, i0, :, :]
+        #     by_xy = f.root.by[:, :, :, k0]
+        #     by_yz = f.root.by[:, i0, :, :]
+        #     bz_xy = f.root.bz[:, :, :, k0]
+        #     bz_yz = f.root.bz[:, i0, :, :]
+        #     vx_xy = f.root.mx[:, :, :, k0]
+        #     vx_yz = f.root.mx[:, i0, :, :]
+        #     vy_xy = f.root.my[:, :, :, k0]
+        #     vy_yz = f.root.my[:, i0, :, :]
+        #     vz_xy = f.root.mz[:, :, :, k0]
+        #     vz_yz = f.root.mz[:, i0, :, :]
+        #     frames = [
+        #         rho_xy,
+        #         rho_yz,
+        #         e_xy,
+        #         e_yz,
+        #         vx_xy,
+        #         vx_yz,
+        #         vy_xy,
+        #         vy_yz,
+        #         vz_xy,
+        #         vz_yz,
+        #         bx_xy,
+        #         bx_yz,
+        #         by_xy,
+        #         by_yz,
+        #         bz_xy,
+        #         bz_yz,
+        #     ]
+        # im_rho_xy = ax_rho_xy.imshow(frames[0][0], origin="lower")
+        # im_rho_yz = ax_rho_yz.imshow(frames[1][0], origin="lower")
+        # cb_rho = fig.colorbar(im_rho_yz, ax=[ax_rho_xy, ax_rho_yz])
+        # im_e_xy = ax_e_xy.imshow(frames[2][0], origin="lower")
+        # im_e_yz = ax_e_yz.imshow(frames[3][0], origin="lower")
+        # cb_e = fig.colorbar(im_e_yz, ax=[ax_e_xy, ax_e_yz])
 
-    # def animate(n):
-    #     rho_xy = frames[0][n]
-    #     rho_yz = frames[0][n]
-    #     vmax = np.max([rho_xy, rho_yz])
-    #     vmin = np.min([rho_xy, rho_yz])
-    #     im_rho_xy.set_data(rho_xy)
-    #     im_rho_xy.set_clim(vmin, vmax)
-    #     im_rho_yz.set_data(rho_yz)
-    #     im_rho_yz.set_clim(vmin, vmax)
+        # def animate(n):
+        #     rho_xy = frames[0][n]
+        #     rho_yz = frames[0][n]
+        #     vmax = np.max([rho_xy, rho_yz])
+        #     vmin = np.min([rho_xy, rho_yz])
+        #     im_rho_xy.set_data(rho_xy)
+        #     im_rho_xy.set_clim(vmin, vmax)
+        #     im_rho_yz.set_data(rho_yz)
+        #     im_rho_yz.set_clim(vmin, vmax)
 
-    # ani = animation.FuncAnimation(fig, animate, frames=len(frames[0]), interval=100)
+        # ani = animation.FuncAnimation(fig, animate, frames=len(frames[0]), interval=100)
+        dt = c.dt
+        subsample_ratio = c.subsample_ratio
         for n in range(f.root.rho.shape[0]):
-        # for n in range(7, 8):
+            # for n in range(7, 8):
 
             rho_xy = ax_rho_xy.imshow(
                 f.root.rho[n, :, :, k0], origin="lower", animated=True
@@ -449,6 +556,13 @@ def animate_mhd(m: MHDModel, plot_title="Animation", repeat: bool = True):
             e_yz = ax_e_yz.imshow(
                 f.root.e[n, i0, :, :], origin="lower", animated=True
             )
+            time_text = ax_rho_xy.text(
+                0.15,
+                0.95,
+                f"t={n*dt*subsample_ratio:.3f}",
+                transform=ax_rho_xy.transAxes,
+                animated=True,
+            )
             frames.append(
                 [
                     rho_xy,
@@ -467,10 +581,10 @@ def animate_mhd(m: MHDModel, plot_title="Animation", repeat: bool = True):
                     by_yz,
                     bz_xy,
                     bz_yz,
+                    time_text,
                 ]
             )
     ani = animation.ArtistAnimation(
-        fig, frames, interval=200, blit=True, repeat_delay=1000
+        fig, frames, interval=2, blit=True, repeat_delay=1000
     )
-    fi
     plt.show()

@@ -18,13 +18,66 @@ import mhd1.plots as plots
 plt.style.use("dark_background")
 
 
+class RiemannShockConfiguration(Configuration):
+    """MHD variant of Sod's shock tube problem.
+
+    See https://doi.org/10.1016/0021-9991(88)90120-9
+    """
+
+    max_history_steps = 40
+
+    def __init__(self):
+        self.Mx = 800
+        self.My = 3
+        self.Mz = 3
+
+        self.x_min = 0
+        self.y_min = 0
+        self.z_min = 0
+
+        self.x_max = self.Mx - 1
+        self.y_max = self.My - 1
+        self.z_max = self.Mz - 1
+
+        self.dt = 0.02
+        self.t_max = 300
+        Configuration.__init__(self)
+
+    def set_initial_conditions(self):
+        Q = np.zeros((8, self.Mx, self.My, self.Mz))
+        x2 = int(self.Mx / 2)
+        gamma = 2
+        mu = 1
+
+        # Bx = 0.75 everywhere
+        Bx = 0.75
+        Q[4, :, :, :] = Bx
+
+        # Left state
+        rho_l = 1
+        p_l = 1
+        By_l = 1
+        Q[0, :x2, :, :] = rho_l
+        Q[5, :x2, :, :] = By_l
+        Q[7, :x2, :, :] = p_l / (gamma - 1) + (Bx ** 2 + By_l ** 2) / (2 * mu)
+
+        # Right state
+        rho_r = 0.125
+        p_r = 0.1
+        By_r = -1
+        Q[0, x2:, :, :] = rho_r
+        Q[5, x2:, :, :] = By_r
+        Q[7, x2:, :, :] = p_r / (gamma - 1) + (Bx ** 2 + By_r ** 2) / (2 * mu)
+        self.initial_Q = Q
+
+
 class ScrewPinchConfiguration(Configuration):
     """Cylindrical screw pinch.
 
     Parabolic axial current distribution and uniform axial magnetic field.
     """
 
-    max_history_steps = 16
+    max_history_steps = 64
 
     def __init__(self, Mx=33, My=33, Mz=33, dt=0.005, t_max=15, j0=1.0, R=8):
         self.Mx = Mx
@@ -37,9 +90,9 @@ class ScrewPinchConfiguration(Configuration):
         self.z_min = 0
 
         # Right-hand boundary of domain
-        self.x_max = Mx + 1
-        self.y_max = My + 1
-        self.z_max = Mz + 1
+        self.x_max = Mx - 1
+        self.y_max = My - 1
+        self.z_max = Mz - 1
 
         # Time step
         self.dt = dt
@@ -92,16 +145,17 @@ class ScrewPinchConfiguration(Configuration):
         # R = (self.Mx - 1) / 4
         R = self.R
         # Peak current
-        j0 = 2
+        j0 = self.j0
         # Constant background pressure
         pmax = 5 * j0 ** 2 * R ** 2 * mu / 48
-        p0 = 0.5 * pmax
+        p0 = 0.1 * pmax
         # Constant B_z
         Q[6, :, :, :] += 1
         # Origin in x-y plane
         io = int((self.Mx - 1) / 2)
         jo = int((self.My - 1) / 2)
         p_mat = np.zeros((self.Mx, self.My))
+        btheta_mat = np.zeros((self.Mx, self.My))
         for i, j in itertools.product(range(self.Mx), range(self.My)):
             x = (i - io) * self.dx
             y = (j - jo) * self.dy
@@ -110,6 +164,7 @@ class ScrewPinchConfiguration(Configuration):
             if r <= R:
                 # Q[3, i, j, :] += J0 * (1 - r ** 2 / R ** 2) * Q[0, i, j, :]
                 btheta = j0 * mu / 2 * (r - r ** 3 / (2 * R ** 2))
+                btheta_mat[i, j] += btheta
                 p = (
                     p0
                     + 5 * j0 ** 2 * R ** 2 * mu / 48
@@ -123,7 +178,8 @@ class ScrewPinchConfiguration(Configuration):
                 Q[4, i, j, :] -= math.sin(theta) * btheta
                 Q[5, i, j, :] += math.cos(theta) * btheta
             else:
-                btheta = j0 * mu * R ** 2 / 4 / r
+                btheta = j0 * mu * R ** 2 / (4 * r)
+                btheta_mat[i, j] += btheta
                 p = p0
                 p_mat[i, j] += p
                 Q[4, i, j, :] -= math.sin(theta) * btheta
@@ -138,13 +194,14 @@ class ScrewPinchConfiguration(Configuration):
         Q[7] += e
         print(f"Pressure along x-axis: {p_mat[:, jo]}")
 
-        # # Plot the plasma pressure profile
-        # plt.figure()
-        # plt.plot(p_mat[:, jo])
-        # plt.xlabel(r"x")
-        # plt.ylabel(r"p")
-        # plt.title("Plasma Pressure")
-        # plt.show()
+        # Plot the plasma pressure profile
+        plt.figure()
+        plt.plot(p_mat[:, jo], label=r"$p$")
+        plt.plot(btheta_mat[:, jo], label=r"$B_ \theta$")
+        plt.xlabel(r"x")
+        plt.title("Initial Pressure Profile")
+        plt.legend()
+        plt.show()
 
         # dB = divB(
         #     B=Q[4:7],
@@ -165,16 +222,26 @@ class ScrewPinchConfiguration(Configuration):
         self.initial_Q = Q
 
 
-c = ScrewPinchConfiguration(Mx=65, My=65, Mz=65, dt=0.01, t_max=1, j0=0.01, R=4)
-m = MHDModel(c, check_divB=True)
+# c = ScrewPinchConfiguration(Mx=65, My=65, Mz=65, dt=0.1, t_max=10, j0=0.5, R=8)
+# m = MHDModel(c, check_divB=True)
 
-plots.plot_initial_distribution_xy(m)
+# # plots.plot_initial_distribution_xy(m)
+# m.run()
+# save_data(m, f"screw_pinch_latest.p")
+
+# # m = load_data("saved_data/mhd1/2021-05-21_826.891204_screw_pinch_latest.p")
+
+# plots.animate_mhd(m)
+
+c = RiemannShockConfiguration()
+m = MHDModel(c, check_divB=False)
 m.run()
-save_data(m, f"screw_pinch_latest.p")
+save_data(m, "riemann_shock.p")
 
-m = load_data("saved_data/mhd1/2021-05-20_59772.789067_screw_pinch_latest.p")
+# m = load_data("saved_data/mhd1/2021-05-21_37632.972219_riemann_shock.p")
 
-plots.animate_mhd(m)
+plots.plot_shock(m)
+
 
 # fig2 = plt.figure()
 # ax_divb = fig2.add_subplot(111)
