@@ -1,6 +1,7 @@
 import datetime
 import os
 import math
+import itertools
 
 import numpy as np
 import tables
@@ -17,13 +18,13 @@ class Configuration:
     """
 
     # Number of grid points in x
-    Mx = 65
+    Mx = 9
 
     # Number of grid points in y
-    My = 65
+    My = 9
 
     # Number of grid points in z
-    Mz = 65
+    Mz = 9
 
     # Left-hand boundary of domain
     x_min = 0
@@ -101,15 +102,10 @@ class Configuration:
         Q[6] = Bz
         Q[7] = e
 
-        Default initial configuration: constant
-
-        TODO: cylindrical screw pinch with axial current distribution and
-        uniform axial magnetic field.
+        Initial configuration:
         """
+
         Q = np.zeros((8, self.Mx, self.My, self.Mz))
-        Q[0, :, :, :] = 0.1 + 0.1 * np.sin(self.x_i)
-        Q[1, 20:30, :, :] = 1
-        Q[6, :, :, :] = 1
         self.initial_Q = Q
 
 
@@ -124,6 +120,14 @@ class ParticleData:
         """Initialize ParticleData."""
         # The current solution state at each grid point
         self.Q = np.copy(c.initial_Q)
+        # The total kinetic energy
+        self.KE = np.zeros(c.t_steps)
+        # The total internal energy
+        self.TE = np.zeros(c.t_steps)
+        # Total magnetic field energy
+        self.FE = np.zeros(c.t_steps)
+        # Maximum value of the divergence of B
+        self.max_divB = np.zeros(c.t_steps)
 
         # Store the history of the solution over time in a pytables dataset
         create_folder(os.path.join(os.getcwd(), "saved_data", "mhd1"))

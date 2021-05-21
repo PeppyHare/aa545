@@ -1,115 +1,174 @@
 import numpy as np
-import numba
-import time
-import h5py
-
-# with h5py.File("data.hdf5", "w") as f:
-#     dset = f.create_dataset(
-#         "Q_hist", (8, 201, 201, 201, 100), dtype="f", compression="gzip"
-#     )
-
-# with h5py.File("data.hdf5", "r") as f:
-#     print("reading")
-#     start_time = time.perf_counter()
-#     print(f["Q_hist"][:, 0, 0, 0, 0])
-#     end_time = time.perf_counter()
-#     print(f"Total elapsed time: {10**6 * (end_time - start_time):.3f} µs")
-
-# with h5py.File("data.hdf5", "a") as f:
-#     print("appending")
-#     start_time = time.perf_counter()
-#     f["Q_hist"][:, :, :, :, 2] = np.ones((8, 201, 201, 201))
-#     end_time = time.perf_counter()
-#     print(f"Total elapsed time: {10**6 * (end_time - start_time):.3f} µs")
-
-# with h5py.File("data.hdf5", "r") as f:
-#     print("reading")
-#     start_time = time.perf_counter()
-#     print(f["Q_hist"][:, 0, 0, 0, 1])
-#     end_time = time.perf_counter()
-#     print(f"Total elapsed time: {10**6 * (end_time - start_time):.3f} µs")
-
-# import os
-
-# import tables
-# import numpy as np
-
-# filename = "outarray.h5"
-
-# os.remove(filename)
-
-# f = tables.open_file(filename, mode="w")
-# atom = tables.Float64Atom()
-
-# array_c = f.create_earray(
-#     f.root, "rho", atom, (0, 201, 201, 201), expectedrows=200
-# )
-# array_c = f.create_earray(
-#     f.root, "mx", atom, (0, 201, 201, 201), expectedrows=200
-# )
-# array_c = f.create_earray(
-#     f.root, "my", atom, (0, 201, 201, 201), expectedrows=200
-# )
-# array_c = f.create_earray(
-#     f.root, "mz", atom, (0, 201, 201, 201), expectedrows=200
-# )
-
-# print(f.root.rho)
-# f.close()
-
-# f = tables.open_file(filename, mode="a")
-# for i in range(200):
-#     start_time = time.perf_counter()
-#     f.root.rho.append(i * np.ones((1, 201, 201, 201)))
-#     f.root.mx.append(i * np.ones((1, 201, 201, 201)))
-#     f.root.my.append(i * np.ones((1, 201, 201, 201)))
-#     f.root.mz.append(i * np.ones((1, 201, 201, 201)))
-#     end_time = time.perf_counter()
-#     print(f"Total elapsed time: {10**6 * (end_time - start_time):.3f} µs")
-
-# print(f.root.rho[:, 0, 0, 0])
-# f.close()
-
-from functools import partial
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-import numpy as np
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
+import time
 
+## Prepare initial data
+a = 20
+d = 20
+tm0 = 10
+t_m = tm0 * np.pi/180
+def phi(t):
+    return np.pi/4 + (6 + 0.1*t) * t
+def r(t):
+    return d/2 * (1 - phi(t)/phi(t_m))
+def Fp(x,y,t):
+    return -1/np.sqrt((x + r(t)*np.cos(phi(t)))**2 + (y + r(t)*np.sin(phi(t)))**2)                                                            \
+           -1/np.sqrt((x - r(t)*np.cos(phi(t)))**2 + (y - r(t)*np.sin(phi(t)))**2)     
+X = np.arange(-1*a, a)
+Y = np.arange(-1*a, a)
+x,y=np.meshgrid(X,Y)
 
-plt.style.use("dark_background")
+## generate image data
+imageList = []
+for t in range(tm0):
+    imageList.append(Fp(x,y,t*np.pi/180))
 
-
-def _animate_frame(frame, time_text):
-
-    global cf, ax
-    x = np.arange(128)
-    y = np.arange(128)
-    X, Y = np.meshgrid(x, y)
-    Z = (
-        np.sin(np.pi * (X / 16 + 0.01 * frame))
-        * np.cos(np.pi * (Y / 32 * frame)) ** 2
-    )
-    cf = ax.contourf(X, Y, Z)
-    time_text.set_text(f"t = {frame}")
-    return (cf, time_text)
-
-
-x = np.arange(128)
-y = np.arange(128)
-X, Y = np.meshgrid(x, y)
-z = np.sin(np.pi * (X / 16)) * np.cos(np.pi * Y / 32) ** 2
-fig, ax = plt.subplots()
-ax.axis("equal")
-ax.axis("off")
-cf = ax.contourf(X, Y, z)
-time_text = plt.text(0.02, 0.95, "")
-animate = partial(_animate_frame, time_text=time_text)
-animation = FuncAnimation(
-    fig, animate, frames=range(100), interval=5, repeat=True
-)
-animation.save(
-    "test.mp4",
-    fps=24,
-    progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
-)
+## Create animation and video from 2D images
+fig = plt.figure(figsize=(10,10))
+ims = []
+for i in range(len(imageList)):
+    im = plt.pcolormesh(imageList[i], animated = True)
+    ims.append([im])
+    
+ani1 = animation.ArtistAnimation(fig, ims, blit=True, repeat_delay=2000)
+plt.colorbar()
 plt.show()
+t1=time.time()
+ani1.to_html5_video()
+t2=time.time()
+print("2D image to video took: ", t2 - t1)
+
+## Create animation and video from 3D images
+t1 = time.time()
+fig = plt.figure()
+ax = Axes3D(fig)
+ims = []
+for i in range(len(imageList)):
+    im = ax.plot_surface(x,y,imageList[i], antialiased=False, animated=True)
+    ims.append([im])
+    
+ani = animation.ArtistAnimation(fig, ims, blit=True, repeat_delay=2000)
+# plt.show()
+t2 = time.time()
+print("3D animation creation took: ", t2 - t1)
+ani.to_html5_video()
+t3=time.time()
+print("3D animation to video took:", t3 - t2)
+
+
+
+
+
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import matplotlib.animation as animation
+# from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+
+# # I like to position my colorbars this way, but you don't have to
+# div = make_axes_locatable(ax)
+# cax = div.append_axes('right', '5%', '5%')
+
+# def f(x, y):
+#     return np.exp(x) + np.sin(y)
+
+# x = np.linspace(0, 1, 120)
+# y = np.linspace(0, 2 * np.pi, 100).reshape(-1, 1)
+
+# # This is now a list of arrays rather than a list of artists
+# frames = []
+# for i in range(10):
+#     x       += 1
+#     curVals  = f(x, y)
+#     frames.append(curVals)
+
+# cv0 = frames[0]
+# im = ax.imshow(cv0, origin='lower') # Here make an AxesImage rather than contour
+# cb = fig.colorbar(im, cax=cax)
+# tx = ax.set_title('Frame 0')
+
+# def animate(i):
+#     arr = frames[i]
+#     vmax     = np.max(arr)
+#     vmin     = np.min(arr)
+#     im.set_data(arr)
+#     im.set_clim(vmin, vmax)
+#     tx.set_text('Frame {0}'.format(i))
+#     # In this version you don't have to do anything to the colorbar,
+#     # it updates itself when the mappable it watches (im) changes
+
+# ani = animation.FuncAnimation(fig, animate, frames=10)
+
+# plt.show()
+
+
+
+
+
+
+
+# from numpy import random
+# from matplotlib import animation
+# import matplotlib.pyplot as plt
+
+# img_lst_1 = [random.random((368, 1232)) for i in range(10)]  # Test data
+# img_lst_2 = [random.random((368, 1232)) for i in range(10)]  # Test data
+
+# fig, (ax1, ax2) = plt.subplots(2, 1)
+# frames = []  # store generated images
+# for i in range(len(img_lst_1)):
+
+#     img1 = ax1.imshow(img_lst_1[i], animated=True)
+#     img2 = ax2.imshow(img_lst_2[i], cmap="gray", animated=True)
+
+#     frames.append([img1, img2])
+
+# ani = animation.ArtistAnimation(
+#     fig, frames, interval=50, blit=True, repeat_delay=1000
+# )
+# plt.show()
+
+
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import matplotlib.animation as animation
+
+# fig, ax = plt.subplots()
+
+
+# def f(x, y):
+#     return np.sin(x) + np.cos(y)
+
+# x = np.linspace(0, 2 * np.pi, 120)
+# y = np.linspace(0, 2 * np.pi, 100).reshape(-1, 1)
+
+# # ims is a list of lists, each row is a list of artists to draw in the
+# # current frame; here we are just animating one artist, the image, in
+# # each frame
+# ims = []
+# for i in range(60):
+#     x += np.pi / 15.
+#     y += np.pi / 20.
+#     im = ax.imshow(f(x, y), animated=True)
+#     if i == 0:
+#         ax.imshow(f(x, y))  # show an initial one first
+#     ims.append([im])
+
+# ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True,
+#                                 repeat_delay=1000)
+
+# # To save the animation, use e.g.
+# #
+# # ani.save("movie.mp4")
+# #
+# # or
+# #
+# # writer = animation.FFMpegWriter(
+# #     fps=15, metadata=dict(artist='Me'), bitrate=1800)
+# # ani.save("movie.mp4", writer=writer)
+
+# plt.show()
