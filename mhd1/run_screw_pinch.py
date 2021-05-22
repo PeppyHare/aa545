@@ -1,12 +1,9 @@
 """Run Ideal MHD Solver."""
 import math
 import itertools
-import datetime
-from pickle import load
 
 import numpy as np
 from matplotlib import pyplot as plt
-import tables
 
 from mhd1.configuration import Configuration
 from mhd1.models import MHDModel
@@ -15,12 +12,13 @@ from mhd1.utils import save_data, load_data
 import mhd1.plots as plots
 
 
-plt.style.use("dark_background")
+plt.style.use("dark_background")  # For comfortable nighttime coding
 
 
 class RiemannShockConfiguration(Configuration):
-    """MHD variant of Sod's shock tube problem.
+    """Brio-Wu MHD shock tube.
 
+    MHD variant of Sod's shock tube problem.
     See https://doi.org/10.1016/0021-9991(88)90120-9
     """
 
@@ -40,7 +38,7 @@ class RiemannShockConfiguration(Configuration):
         self.z_max = self.Mz - 1
 
         self.dt = 0.02
-        self.t_max = 300
+        self.t_max = 400
         Configuration.__init__(self)
 
     def set_initial_conditions(self):
@@ -79,7 +77,9 @@ class ScrewPinchConfiguration(Configuration):
 
     max_history_steps = 64
 
-    def __init__(self, Mx=33, My=33, Mz=33, dt=0.005, t_max=15, j0=1.0, R=8):
+    def __init__(
+        self, Mx=33, My=33, Mz=33, dt=0.005, t_max=15, j0=1.0, R=8, B0=1
+    ):
         self.Mx = Mx
         self.My = My
         self.Mz = Mz
@@ -100,6 +100,9 @@ class ScrewPinchConfiguration(Configuration):
 
         # Maximum current density
         self.j0 = j0
+
+        # Axial magnetic field
+        self.B0 = B0
 
         # Pinch radius
         self.R = R
@@ -133,9 +136,6 @@ class ScrewPinchConfiguration(Configuration):
         mu = self.mu
         gamma = self.gamma
 
-        # # Constant background density
-        # rho0 = 0.05
-        # Q[0, :, :, :] += rho0
         # Constant temperature
         T = 1
         # Ion mass
@@ -150,7 +150,7 @@ class ScrewPinchConfiguration(Configuration):
         pmax = 5 * j0 ** 2 * R ** 2 * mu / 48
         p0 = 0.1 * pmax
         # Constant B_z
-        Q[6, :, :, :] += 1
+        Q[6, :, :, :] += self.B0
         # Origin in x-y plane
         io = int((self.Mx - 1) / 2)
         jo = int((self.My - 1) / 2)
@@ -203,62 +203,45 @@ class ScrewPinchConfiguration(Configuration):
         plt.legend()
         plt.show()
 
-        # dB = divB(
-        #     B=Q[4:7],
-        #     dx=self.dx,
-        #     dy=self.dy,
-        #     dz=self.dz,
-        #     bcx=self.bcx,
-        #     bcy=self.bcy,
-        #     bcz=self.bcz,
-        # )
-        # plt.figure()
-        # plt.imshow(dB[:, :, int(self.Mz / 2)], origin="lower")
-        # plt.colorbar()
-        # plt.xlabel(r"$x$")
-        # plt.ylabel(r"$y$")
-        # plt.title(r"$\nabla \cdot B$")
-        # plt.show()
+        dB = divB(
+            B=Q[4:7],
+            dx=self.dx,
+            dy=self.dy,
+            dz=self.dz,
+            bcx=self.bcx,
+            bcy=self.bcy,
+            bcz=self.bcz,
+        )
+        plt.figure()
+        plt.imshow(dB[:, :, int(self.Mz / 2)], origin="lower")
+        plt.colorbar()
+        plt.xlabel(r"$x$")
+        plt.ylabel(r"$y$")
+        plt.title(r"$\nabla \cdot B$")
+        plt.show()
         self.initial_Q = Q
 
 
-# c = ScrewPinchConfiguration(Mx=65, My=65, Mz=65, dt=0.1, t_max=10, j0=0.5, R=8)
-# m = MHDModel(c, check_divB=True)
+c = ScrewPinchConfiguration(Mx=65, My=65, Mz=65, dt=0.05, t_max=10, j0=0.5, R=8)
+m = MHDModel(c, check_divB=True)
+plots.plot_initial_distribution_all_axes(m)
 
-# # plots.plot_initial_distribution_xy(m)
-# m.run()
-# save_data(m, f"screw_pinch_latest.p")
+m.run()
+save_data(m, f"screw_pinch_latest.p")
 
-# # m = load_data("saved_data/mhd1/2021-05-21_826.891204_screw_pinch_latest.p")
-
-# plots.animate_mhd(m)
+# m = load_data("saved_data/mhd1/2021-05-21_82451.590781_screw_pinch_latest.p")
+plots.mhd_snapshot(m, 3)
+plots.animate_mhd(m)
 
 c = RiemannShockConfiguration()
 m = MHDModel(c, check_divB=False)
 m.run()
 save_data(m, "riemann_shock.p")
 
-# m = load_data("saved_data/mhd1/2021-05-21_37632.972219_riemann_shock.p")
+# m = load_data("saved_data/mhd1/2021-05-21_76895.019152_riemann_shock.p")
+
+plots.shock_snapshots(m, n=0)
+plots.shock_snapshots(m, n=2)
+plots.shock_snapshots(m, n=5)
 
 plots.plot_shock(m)
-
-
-# fig2 = plt.figure()
-# ax_divb = fig2.add_subplot(111)
-# ax_divb.plot(m.d.max_divB)
-# plt.xlabel("$t$")
-# plt.ylabel(r"max($\nabla \cdot B$)")
-
-# fig1 = plt.figure(figsize=(6, 8))
-# ax_e = fig1.add_subplot(111)
-# ax_e.plot(m.d.KE, label="KE")
-# ax_e.plot(m.d.TE, label="TE")
-# ax_e.plot(m.d.FE, label="FE")
-# plt.legend()
-# plt.xlabel(r"$t$")
-# plt.ylabel(r"Energy")
-# plt.yscale("log")
-
-# plt.show()
-
-# f = tables.open_file(m.d.h5_filename)

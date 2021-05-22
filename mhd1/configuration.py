@@ -1,7 +1,6 @@
 import datetime
 import os
 import math
-import itertools
 
 import numpy as np
 import tables
@@ -32,9 +31,9 @@ class Configuration:
     z_min = 0
 
     # Right-hand boundary of domain
-    x_max = Mx + 1
-    y_max = My + 1
-    z_max = Mz + 1
+    x_max = Mx - 1
+    y_max = My - 1
+    z_max = Mz - 1
 
     # Time step
     dt = 0.5
@@ -57,7 +56,7 @@ class Configuration:
     # Integration method
     time_step_method = staticmethod(maccormack_time_step)
 
-    # Max number of time steps to hold in memory.
+    # Max number of time steps to write to disk.
     # If t_steps greater than this, subsampling will occur.
     max_history_steps = 32
 
@@ -79,7 +78,7 @@ class Configuration:
         # Time axis used for plots
         self.time_axis = np.linspace(0, self.t_max, self.t_steps)
 
-        # Number of subsampled frames to hold in memory
+        # Number of subsampled frames to write to disk
         self.history_steps = min(self.t_steps, self.max_history_steps)
 
         # Full state is stored every {subsample_ratio} time steps

@@ -70,15 +70,6 @@ class MHDModel:
             if np.min(d.Q[0]) < 10 ** -12:
                 print(f"Density {np.min(d.Q[0])} is too small!")
                 break
-            # Check for CFL condition
-            (cfl_x, cfl_y, cfl_z) = calc_cfl(d.Q, c.dx, c.dy, c.dz, c.dt)
-            print(
-                f"Current CFL numbers: Cx={cfl_x:.3f}, Cy={cfl_y:.3f},"
-                f" Cz={cfl_z:.3f}"
-            )
-            if cfl_x >= 1 or cfl_y >= 1 or cfl_z >= 1:
-                print("CFL condition violated!")
-                break
             time_step_method(
                 Q=d.Q,
                 dx=c.dx,
@@ -87,7 +78,19 @@ class MHDModel:
                 dt=c.dt,
             )
             if n % c.subsample_ratio == 0 and n > 0:
+                # Write current state to disk
                 self.write_out_data(d.Q)
+
+                # Check for CFL condition
+                (cfl_x, cfl_y, cfl_z) = calc_cfl(d.Q, c.dx, c.dy, c.dz, c.dt)
+                # print(
+                #     f"Current CFL numbers: Cx={cfl_x:.3f}, Cy={cfl_y:.3f},"
+                #     f" Cz={cfl_z:.3f}"
+                # )
+                if cfl_x >= 1 or cfl_y >= 1 or cfl_z >= 1:
+                    print("CFL condition violated!")
+                    break
+
             # Calculate total energy
             self.d.TE[n] += np.sum(d.Q[7])
             # Calculate total kinetic energy
@@ -120,7 +123,7 @@ class MHDModel:
             bar.finish()
         end_time = time.perf_counter()
         print(
-            f"Done! Took {10**-6 * (end_time - start_time):.2f}ms. Timeseries"
+            f"Done! Took {(end_time - start_time):.2f}s. Timeseries"
             f" data saved to {self.d.h5_filename}"
         )
         self.has_run = True

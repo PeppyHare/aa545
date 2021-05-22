@@ -1,15 +1,13 @@
-# Finite Difference Scheme Investigation
+# Ideal MHD 3D MacCormack Finite Difference Integrator
 
-This module investigates the instability and accuracy of the following finite difference schemes, applied to a model hyperbolic equation (the linear advection equation):
+This module implements a Lax-Wendroff type finite difference method to solve the nonlinear, time-dependent ideal MHD equations. Two test problems are used to validate the model:
 
-- Forward-time, centered-space
-- Simple upwind difference
-- Lax-Friedrichs
-- Lax-Wendroff
+- The Brio-Wu shock tube problem. A 1.5D Riemann problem is set up which generates five different wave solutions. This tests the model's ability to capture waves and handle discontinuities.
+- A screw pinch plasma with a parabolic axial current density and constant axial magnetic field. As an equilibrium configuration, the solution should remain stable for certain values of the safety factor q. Initializing a perturbation in velocity helps to incite unstable kink modes.
 
 ## Running the Script
 
-To run the investigation, execute the `run_ftcs.py` script. Requires a Python install (NumPy 1.20.2 supports either Python 3.7 or Python 3.8) with either `pip` or `poetry` for depdency installation. To install dependencies, follow the appropriate section:
+To run the investigation, execute the `run_screw_pinch.py` script. Requires a Python install (NumPy 1.20.2 supports either Python 3.7 or Python 3.8) with either `pip` or `poetry` for depdency installation. To install dependencies, follow the appropriate section:
 
 ### Using Poetry
 

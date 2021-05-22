@@ -14,8 +14,8 @@ def F(Q: npt.ArrayLike):
     dQ/dt + dF/dx + dG/dy + dH/dz = 0
     """
     F = np.zeros_like(Q)
-    # gamma = 5 / 3
-    gamma = 2
+    gamma = 5 / 3  # For 3D problems
+    # gamma = 2  # For 1D problems
     mu = 1.0
     # What happens when Q[0] == 0? Best not to think about it...
     rvsq = (Q[1] ** 2 + Q[2] ** 2 + Q[3] ** 2) / Q[0]  # rho * v^2
@@ -44,8 +44,9 @@ def G(Q: npt.ArrayLike):
     dQ/dt + dF/dx + dG/dy + dH/dz = 0
     """
     G = np.zeros_like(Q)
-    # gamma = 5 / 3
-    gamma = 2
+    gamma = 5 / 3  # For 3D problems
+    # gamma = 2  # For 1D problems
+    # return G  # Useful short-circuit for decreasing dimensionality
     mu = 1.0
     # What happens when Q[0] == 0? Best not to think about it...
     rvsq = (Q[1] ** 2 + Q[2] ** 2 + Q[3] ** 2) / Q[0]  # rho * v^2
@@ -75,8 +76,9 @@ def H(Q: npt.ArrayLike):
     dQ/dt + dF/dx + dG/dy + dH/dz = 0
     """
     H = np.zeros_like(Q)
-    # gamma = 5 / 3
-    gamma = 2
+    gamma = 5 / 3  # For 3D problems
+    # gamma = 2  # For 1D problems
+    # return H  # Useful short-circuit for decreasing dimensionality
     mu = 1.0
     # What happens when Q[0] == 0? Best not to think about it...
     rvsq = (Q[1] ** 2 + Q[2] ** 2 + Q[3] ** 2) / Q[0]  # rho * v^2
@@ -158,37 +160,101 @@ def maccormack_time_step(
     corr[:, :, :, 0] -= (
         dt / dz * (F(pred[:, :, :, 0]) - F(pred[:, :, :, Mz - 1]))
     )
+    diffusion_method = "post_avg"
+    visc = 0.1 * dx ** 2 / dt
+    # Add artificial diffusion
+    if diffusion_method == "pre_avg":
+        for i in numba.prange(1, Mx - 1):
+            pred[:, i, :, :] += (
+                visc
+                * dt
+                / dx ** 2
+                * (
+                    pred[:, i + 1, :, :]
+                    - 2 * pred[:, i, :, :]
+                    + pred[:, i - 1, :, :]
+                )
+            )
+            corr[:, i, :, :] += (
+                visc
+                * dt
+                / dx ** 2
+                * (
+                    corr[:, i + 1, :, :]
+                    - 2 * corr[:, i, :, :]
+                    + corr[:, i - 1, :, :]
+                )
+            )
+        for j in numba.prange(0, My - 1):
+            pred[:, :, j, :] += (
+                visc
+                * dt
+                / dy ** 2
+                * (
+                    pred[:, :, j + 1, :]
+                    - 2 * pred[:, :, j, :]
+                    + pred[:, :, j - 1, :]
+                )
+            )
+            corr[:, :, j, :] += (
+                visc
+                * dt
+                / dy ** 2
+                * (
+                    corr[:, :, j + 1, :]
+                    - 2 * corr[:, :, j, :]
+                    + corr[:, :, j - 1, :]
+                )
+            )
+        for k in numba.prange(0, Mz):
+            pred[:, :, k, :] += (
+                visc
+                * dt
+                / dz ** 2
+                * (
+                    pred[:, :, :, ((k + 1) % Mz)]
+                    - 2 * pred[:, :, :, k]
+                    + pred[:, :, :, ((k - 1) % Mz)]
+                )
+            )
+            corr[:, :, k, :] += (
+                visc
+                * dt
+                / dz ** 2
+                * (
+                    corr[:, :, :, ((k + 1) % Mz)]
+                    - 2 * corr[:, :, :, k]
+                    + corr[:, :, :, ((k - 1) % Mz)]
+                )
+            )
 
     Q += (pred + corr) / 2 - Q
-
-    # Add artificial diffusion
-    visc = 0.1 * dx ** 2 / dt
-    # visc = 0
-    for i in numba.prange(1, Mx - 1):
-        Q[:, i, :, :] += (
-            visc
-            * dt
-            / dx ** 2
-            * (Q[:, i + 1, :, :] - 2 * Q[:, i, :, :] + Q[:, i - 1, :, :])
-        )
-    for j in numba.prange(0, My - 1):
-        Q[:, :, j, :] += (
-            visc
-            * dt
-            / dy ** 2
-            * (Q[:, :, j + 1, :] - 2 * Q[:, :, j, :] + Q[:, :, j - 1, :])
-        )
-    for k in numba.prange(0, Mz):
-        Q[:, :, k, :] += (
-            visc
-            * dt
-            / dz ** 2
-            * (
-                Q[:, :, :, ((k + 1) % Mz)]
-                - 2 * Q[:, :, :, k]
-                + Q[:, :, :, ((k - 1) % Mz)]
+    if diffusion_method == "post_avg":
+        for i in numba.prange(1, Mx - 1):
+            Q[:, i, :, :] += (
+                visc
+                * dt
+                / dx ** 2
+                * (Q[:, i + 1, :, :] - 2 * Q[:, i, :, :] + Q[:, i - 1, :, :])
             )
-        )
+        for j in numba.prange(0, My - 1):
+            Q[:, :, j, :] += (
+                visc
+                * dt
+                / dy ** 2
+                * (Q[:, :, j + 1, :] - 2 * Q[:, :, j, :] + Q[:, :, j - 1, :])
+            )
+        for k in numba.prange(0, Mz):
+            Q[:, :, k, :] += (
+                visc
+                * dt
+                / dz ** 2
+                * (
+                    Q[:, :, :, ((k + 1) % Mz)]
+                    - 2 * Q[:, :, :, k]
+                    + Q[:, :, :, ((k - 1) % Mz)]
+                )
+            )
 
 
 @numba.njit(boundscheck=True, nogil=True)
@@ -217,33 +283,18 @@ def divB(
     if bcx == 0:  # periodic BC
         div[0] += (B[0, 1] - B[0, Mx - 1]) / (2 * dx)
         div[Mx - 1] += (B[0, 0] - B[0, Mx - 2]) / (2 * dx)
-    # elif bcx == 1:  # conducting rigid wall BC
-    # assert np.sum(B[0, 0]) < 10 ** -6
-    # assert np.sum(B[0, Mx - 1]) < 10 ** -6
-    # else:
-    #     raise Exception("Unsupported boundary conditions")
 
     for j in numba.prange(1, My - 1):
         div[:, j] += (B[1, :, j + 1] - B[1, :, j - 1]) / (2 * dy)
     if bcy == 0:  # periodic BC
         div[:, 0] += (B[1, :, 1] - B[1, :, My - 1]) / (2 * dy)
         div[:, My - 1] += (B[1, :, 0] - B[1, :, My - 2]) / (2 * dy)
-    # elif bcy == 1:  # conducting rigid wall BC
-    # assert np.sum(B[1, :, 0]) < 10 ** -6
-    # assert np.sum(B[1, :, My - 1]) < 10 ** -6
-    # else:
-    #     raise Exception("Unsupported boundary conditions")
 
     for k in numba.prange(1, Mz - 1):
         div[:, :, k] += (B[2, :, :, k + 1] - B[2, :, :, k - 1]) / (2 * dz)
     if bcz == 0:  # periodic BC
         div[:, :, 0] += (B[2, :, :, 1] - B[2, :, :, Mz - 1]) / (2 * dz)
         div[:, :, Mz - 1] += (B[2, :, :, 0] - B[2, :, :, Mz - 2]) / (2 * dz)
-    # elif bcz == 1:  # conducting rigid wall BC
-    # assert np.sum(B[2, :, :, 0]) < 10 ** -6
-    # assert np.sum(B[2, :, :, Mz - 1]) < 10 ** -6
-    # else:
-    #     raise Exception("Unsupported boundary conditions")
     return div
 
 
@@ -253,8 +304,8 @@ def calc_cfl(Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float):
 
     # The largest wave speed is the fluid velocity plus the fast alfven
     # speed
-    # gamma = 5 / 3
-    gamma = 2
+    gamma = 5 / 3  # For 3D problems
+    # gamma = 2  # For 1D problems
     mu = 1.0
 
     # Square of the Alfven speed
