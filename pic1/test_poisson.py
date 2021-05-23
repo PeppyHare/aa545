@@ -1,4 +1,9 @@
-from poisson import setup_poisson, setup_poisson2, solve_poisson, solve_poisson2
+from pic1.poisson import (
+    setup_poisson,
+    setup_poisson2,
+    solve_poisson,
+    solve_poisson2,
+)
 import numpy as np
 
 

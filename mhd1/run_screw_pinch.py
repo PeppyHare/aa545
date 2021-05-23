@@ -227,11 +227,13 @@ m = MHDModel(c, check_divB=True)
 plots.plot_initial_distribution_all_axes(m)
 
 m.run()
-save_data(m, f"screw_pinch_latest.p")
+save_data(m, "screw_pinch_latest.p")
 
 # m = load_data("saved_data/mhd1/2021-05-21_82451.590781_screw_pinch_latest.p")
-plots.mhd_snapshot(m, 3)
+
 plots.animate_mhd(m)
+plots.mhd_snapshot(m, 3)
+
 
 c = RiemannShockConfiguration()
 m = MHDModel(c, check_divB=False)

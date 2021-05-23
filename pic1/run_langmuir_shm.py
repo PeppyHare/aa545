@@ -6,10 +6,10 @@ particles will undergo simple harmonic motion.
 """
 import numpy as np
 
-from configuration import Configuration
-from model import PicModel
-import plots
-from util import count_crossings
+from pic1.configuration import Configuration
+from pic1.model import PicModel
+import pic1.plots as plots
+from pic1.util import count_crossings
 
 
 class SHMConfiguration(Configuration):
@@ -20,7 +20,7 @@ class SHMConfiguration(Configuration):
     vx_min = -1
     vx_max = 1
     wp = 1.0
-    dt = 0.0001
+    dt = 0.01
     n_periods = 8
     markersize = 10
     max_history_steps = 1000
@@ -39,12 +39,20 @@ class SHMConfiguration(Configuration):
 
 c = SHMConfiguration()
 m = PicModel(c)
+
+
+# # PUT THIS BACK LATER
 # plots.plot_initial_distribution(m)
+# m.run()
+# # Get the data from the run
+# d = m.d
+# freq = count_crossings(d.fe_hist) / 4 / c.n_periods
+# print(f"Measured frequency: {freq:.2f}, wp: {c.wp:.2f}")
+# plots.animate_phase_space(
+#     m, plot_title="2-particle simple harmonic motion", repeat=True, hold=False
+# )
+
 m.run()
-# Get the data from the run
-d = m.d
-freq = count_crossings(d.fe_hist) / 4 / c.n_periods
-print(f"Measured frequency: {freq:.2f}, wp: {c.wp:.2f}")
 plots.animate_phase_space(
-    m, plot_title="2-particle simple harmonic motion", repeat=True
+    m, plot_title="2-particle simple harmonic motion", repeat=True, hold=False
 )

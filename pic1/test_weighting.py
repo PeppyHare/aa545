@@ -1,6 +1,6 @@
 import numpy as np
 
-from weighting import weight_particles, weight_field
+from pic1.weighting import weight_particles, weight_field
 
 
 def test_ngp_weight_particles():

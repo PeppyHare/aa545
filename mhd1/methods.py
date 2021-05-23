@@ -99,7 +99,7 @@ def H(Q: npt.ArrayLike):
     return H
 
 
-@numba.njit(boundscheck=True, parallel=False, nogil=True, cache=False)
+@numba.njit(boundscheck=True, nogil=True, cache=True)
 def maccormack_time_step(
     Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float
 ):

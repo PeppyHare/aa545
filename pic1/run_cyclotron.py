@@ -6,10 +6,10 @@ and has no initial velocity in the x-direction.
 """
 import numpy as np
 
-from configuration import Configuration
-from model import PicModel
-import plots
-from util import count_crossings
+from pic1.configuration import Configuration
+from pic1.model import PicModel
+import pic1.plots as plots
+from pic1.util import count_crossings
 
 
 class CyclotronConfiguration(Configuration):

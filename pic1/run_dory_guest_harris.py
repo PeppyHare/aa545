@@ -1,14 +1,16 @@
 """Dory-Guest-Harris Instability."""
+import os
 
 import numpy as np
 from matplotlib import pyplot as plt
 
-from configuration import Configuration
-from model import PicModel
-from util import save_data
-import plots
+from pic1.configuration import Configuration
+from pic1.model import PicModel
+from pic1.util import load_data, save_data
+import pic1.plots as plots
 
 plt.style.use("dark_background")
+demo_mode = True  # Don't re-run simulation during a demo
 
 
 class DGHConfiguration(Configuration):
@@ -61,7 +63,8 @@ class DGHConfiguration(Configuration):
         theta = 2 * np.pi * np.arange(n_ring) / n_ring
         init_positions += 0.001 * np.cos(self.k * init_positions)
         for group in range(n_x):
-            # Disrupt any correlation between x and theta
+            # Disrupt any correlation between x and theta. Only needed if
+            # initial velocity distribution is warm
             # np.random.shuffle(theta)
             start_idx = group * n_ring
             end_idx = (group + 1) * n_ring
@@ -99,4 +102,22 @@ def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
 
 
 if __name__ == "__main__":
-    run_dgh(5.5, k=1, n_periods=20)
+    if not demo_mode:
+        run_dgh(5.5, k=1, n_periods=20)
+
+    else:
+        # For demo purposes, load the results from a previously-completed run
+        m = load_data(
+            os.path.join(
+                "saved_data", "pic1", "2021-05-23_40920.687154_dgh_5.50_big.p"
+            )
+        )
+        plots.plot_initial_distribution(m)
+        plots.animate_phase_space(
+            m,
+            plot_title=(
+                "Dory-Guest-Harris Instability: $k v_0 / \omega_c = 5.5$"
+            ),
+            repeat=True,
+            hold=True,
+        )

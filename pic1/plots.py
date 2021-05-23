@@ -4,12 +4,16 @@ import math
 import os
 from functools import partial
 
+import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
-from model import PicModel
-from util import save_plot, create_folder
+from pic1.model import PicModel
+from pic1.util import save_plot, create_folder
+
+plt.rcParams.update({"axes.titlesize": 26})
+plt.rcParams.update({"axes.labelsize": 20})
 
 
 def _plot_energy_ax(m: PicModel, ax_energy, title="Energy"):
@@ -49,6 +53,8 @@ def plot_energy_history(
     fig = plt.figure(figsize=(12, 6))
     ax_energy = fig.add_subplot(2, 1, (1, 2))
     _plot_energy_ax(m, ax_energy, title=plot_title)
+    mng = plt.get_current_fig_manager()
+    mng.window.state("zoomed")
     plt.tight_layout()
     now_seconds = (
         datetime.datetime.now()
@@ -153,6 +159,8 @@ def plot_initial_distribution(m: PicModel, hold=True):
     plt.tight_layout()
     save_plot(f"initial_hist_{c.N}_particles.pdf")
     if hold:
+        mng = plt.get_current_fig_manager()
+        mng.window.state("zoomed")
         plt.show()  # Waits for user to close the plot
 
 
@@ -174,8 +182,6 @@ def plot_snapshots_velocity_phase_space(
     dt = c.dt
     t_steps = c.t_steps
     L = c.L
-    x_min = c.x_min
-    x_range = c.x_range
     subsample_ratio = c.subsample_ratio
     vx_hist = d.vx_hist
     vy_hist = d.vy_hist
@@ -220,6 +226,8 @@ def plot_snapshots_velocity_phase_space(
         if idx == num_subplots:
             ax_xv.set_xlabel("$v_x$")
         idx += 1
+    mng = plt.get_current_fig_manager()
+    mng.window.state("zoomed")
     plt.tight_layout()
     save_plot(filename)
     if hold:
@@ -278,6 +286,8 @@ def plot_snapshots_velocity(
         )
     ax_fv.legend()
     plt.yscale("log")
+    mng = plt.get_current_fig_manager()
+    mng.window.state("zoomed")
     plt.tight_layout()
     save_plot(f"fvx_hist_{N}_particles.pdf")
     if hold:
@@ -349,6 +359,8 @@ def plot_snapshots(
         if idx == num_subplots:
             ax_xv.set_xlabel("x")
         idx += 1
+    mng = plt.get_current_fig_manager()
+    mng.window.state("zoomed")
     plt.tight_layout()
     save_plot(filename)
     if hold:
@@ -430,6 +442,8 @@ def plot_traces(
     ax_energy = fig.add_subplot(2, 2, (3, 4))
     _plot_energy_ax(m, ax_energy)
     plt.tight_layout()
+    mng = plt.get_current_fig_manager()
+    mng.window.state("zoomed")
     save_plot(f"traces_{N}_particles.pdf")
     if hold:
         plt.show()  # Waits for user to close the plots
@@ -475,7 +489,8 @@ def _animate_frame(
 def animate_phase_space(
     m: PicModel,
     plot_title="Phase space animation",
-    repeat: bool = False,
+    is_1d: bool = True,
+    repeat: bool = True,
     hold: bool = True,
 ):
     """Generate an animation of the particles in phase space over time.
@@ -510,12 +525,18 @@ def animate_phase_space(
     ax_xv.set_ylim(vx_range)
 
     ax_vv.set_title("Velocity space animation")
-    ax_vv.set_ylabel(r"$v_y$")
-    ax_vv.set_xlabel(r"$v_x$")
-    ax_vv.set_xlim(vx_range)
-    vy_range = (np.min(d.vy_hist) * 1.2 * c.L, np.max(d.vy_hist) * 1.2 * c.L)
-    if vy_range[1] - vy_range[0] > 10 ** -12:
-        ax_vv.set_ylim(vy_range)
+    if is_1d:
+        ax_vv.set_ylabel(r"$v_x$")
+        ax_vv.set_xlabel(r"$x$")
+        ax_vv.set_xlim(x_range)
+        ax_vv.set_ylim(vx_range)
+    else:
+        ax_vv.set_ylabel(r"$v_y$")
+        ax_vv.set_xlabel(r"$v_x$")
+        ax_vv.set_xlim(vx_range)
+        vy_range = (np.min(d.vy_hist) * 1.2 * c.L, np.max(d.vy_hist) * 1.2 * c.L)
+        if vy_range[1] - vy_range[0] > 10 ** -12:
+            ax_vv.set_ylim(vy_range)
 
     _plot_energy_ax(m, ax_energy)
     vline_t = ax_energy.axvline(0, ls="--", color="darkgray", zorder=10)
@@ -604,8 +625,12 @@ def animate_phase_space(
     )
     plt.tight_layout()
     if hold:
+        mng = plt.get_current_fig_manager()
+        mng.window.state("zoomed")
         plt.show()  # Waits for user to close the plot
     else:
+        mng = plt.get_current_fig_manager()
+        mng.window.state("zoomed")
         create_folder(os.path.join(os.getcwd(), "plots", "pic1"))
         now_seconds = (
             datetime.datetime.now()
@@ -618,11 +643,12 @@ def animate_phase_space(
             "pic1",
             f"animation_{datetime.datetime.now().strftime('%Y-%m-%d_') + str(now_seconds)}.mp4",
         )
+        matplotlib.rcParams["animation.embed_limit"] = 2 ** 128
         animation.save(
             animation_name,
             fps=int(last_frame / 15),  # 15 second animation
-            dpi="figure",
-            # progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
+            dpi=600,
+            progress_callback=lambda i, n: print(f"Saving frame {i} of {n}"),
         )
         plt.close(fig)
         print(f"Saved animation {animation_name} to disk.")

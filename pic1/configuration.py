@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from poisson import setup_poisson
+from pic1.poisson import setup_poisson
 
 
 class Configuration:

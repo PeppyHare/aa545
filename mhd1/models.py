@@ -6,7 +6,7 @@ import numpy as np
 import progressbar
 import tables
 
-from mhd1.configuration import Configuration, ParticleData
+from mhd1.configuration import Configuration, GridData
 from mhd1.methods import divB, calc_cfl
 
 
@@ -18,7 +18,7 @@ class MHDModel:
     def __init__(self, c: Configuration, check_divB=False):
         """Initialize model."""
         self.c = c
-        self.d = ParticleData(c)
+        self.d = GridData(c)
         self.check_divB = check_divB
 
     def write_out_data(self, Q):

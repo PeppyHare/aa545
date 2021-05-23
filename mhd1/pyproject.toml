@@ -11,6 +11,7 @@ numpy = "^1.20.2"
 numba = "^0.53.1"
 progressbar = "^2.5"
 scipy = "^1.6.2"
+tables = "^3.6.1"
 
 
 [tool.poetry.dev-dependencies]

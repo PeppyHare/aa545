@@ -108,7 +108,7 @@ class Configuration:
         self.initial_Q = Q
 
 
-class ParticleData:
+class GridData:
     """Struct containing the state and history of simulation data.
 
     The data contained in these objects & vectors will change over the course
@@ -116,7 +116,7 @@ class ParticleData:
     """
 
     def __init__(self, c: Configuration):
-        """Initialize ParticleData."""
+        """Initialize GridData."""
         # The current solution state at each grid point
         self.Q = np.copy(c.initial_Q)
         # The total kinetic energy

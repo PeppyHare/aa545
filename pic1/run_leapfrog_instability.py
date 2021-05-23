@@ -12,10 +12,10 @@ result for the leap-frog instability to demonstrate phase error and
 instability."""
 import numpy as np
 
-from configuration import Configuration
-from model import PicModel
-from util import count_crossings
-import plots
+from pic1.configuration import Configuration
+from pic1.model import PicModel
+from pic1.util import count_crossings
+import pic1.plots as plots
 
 
 class LeapfrogInstabilityConfiguration(Configuration):
@@ -31,13 +31,14 @@ class LeapfrogInstabilityConfiguration(Configuration):
 
     def set_initial_conditions(self):
         initial_x = np.linspace(self.x_min, self.x_max, self.N + 1)[:-1]
-        initial_v = 0.001 * np.sin(initial_x)
+        initial_vx = 0.001 * np.sin(initial_x)
         # Split odd/even points by colors for more useful plotting
         initial_x = np.concatenate([initial_x[::2], initial_x[1::2]])
-        initial_v = np.concatenate([initial_v[::2], initial_v[1::2]])
+        initial_vx = np.concatenate([initial_vx[::2], initial_vx[1::2]])
 
         self.initial_x = initial_x
-        self.initial_v = initial_v
+        self.initial_vx = initial_vx
+        self.initial_vy = np.zeros_like(initial_vx)
 
 
 c = LeapfrogInstabilityConfiguration()

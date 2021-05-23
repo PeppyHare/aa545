@@ -5,9 +5,9 @@ import numba
 import numpy as np
 import progressbar
 
-from configuration import Configuration, ParticleData
-from weighting import weight_particles, weight_field
-from poisson import compute_field
+from pic1.configuration import Configuration, ParticleData
+from pic1.weighting import weight_particles, weight_field
+from pic1.poisson import compute_field
 
 
 @numba.njit(nogil=True)

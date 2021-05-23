@@ -1,6 +1,6 @@
 import numpy as np
 
-from model import rotate_xy
+from pic1.model import rotate_xy
 
 
 def test_rotate_xy():
