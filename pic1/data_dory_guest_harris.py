@@ -84,13 +84,6 @@ def analyze_dgh(save_file, param):
         e_scaled = fe_range / np.exp(lr.slope * time_axis + lr.intercept)
         e_fft = np.real(np.fft.rfft(e_scaled))
         k_vec = np.fft.rfftfreq(len(e_scaled))
-        topk = np.argpartition(e_fft, -4)[-4:]
-        if not demo_mode:
-            for idx in topk:
-                print(
-                    f"k={k_vec[idx]}, fft[k]={e_fft[idx]},"
-                    f" w={2 * np.pi * k_vec[idx] / c.dt}"
-                )
         w_re = (
             count_crossings(e_scaled)
             / 4
