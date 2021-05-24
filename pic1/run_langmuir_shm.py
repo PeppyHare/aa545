@@ -5,11 +5,16 @@ displacement. Initial velocity of each particle is zero. Once released, the
 particles will undergo simple harmonic motion.
 """
 import numpy as np
+from matplotlib import pyplot as plt
 
 from pic1.configuration import Configuration
 from pic1.model import PicModel
 import pic1.plots as plots
 from pic1.util import count_crossings
+
+
+plt.style.use("dark_background")
+demo_mode = True
 
 
 class SHMConfiguration(Configuration):
@@ -40,19 +45,20 @@ class SHMConfiguration(Configuration):
 c = SHMConfiguration()
 m = PicModel(c)
 
+if demo_mode:
+    m.run()
+    plots.animate_phase_space(
+        m, plot_title="2-particle simple harmonic motion", repeat=True, hold=True
+    )
 
-# # PUT THIS BACK LATER
-# plots.plot_initial_distribution(m)
-# m.run()
-# # Get the data from the run
-# d = m.d
-# freq = count_crossings(d.fe_hist) / 4 / c.n_periods
-# print(f"Measured frequency: {freq:.2f}, wp: {c.wp:.2f}")
-# plots.animate_phase_space(
-#     m, plot_title="2-particle simple harmonic motion", repeat=True, hold=False
-# )
+else:
+    plots.plot_initial_distribution(m)
+    m.run()
+    # Get the data from the run
+    d = m.d
+    freq = count_crossings(d.fe_hist) / 4 / c.n_periods
+    print(f"Measured frequency: {freq:.2f}, wp: {c.wp:.2f}")
+    plots.animate_phase_space(
+        m, plot_title="2-particle simple harmonic motion", repeat=True, hold=False
+    )
 
-m.run()
-plots.animate_phase_space(
-    m, plot_title="2-particle simple harmonic motion", repeat=True, hold=False
-)

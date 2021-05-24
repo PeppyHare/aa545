@@ -72,8 +72,8 @@ def solve_poisson_fft(rho, kx, dx):
     m = rho.shape[0]
     with numba.objmode(phi_j="float64[:]"):
         rho_fft = np.fft.fft(rho)
-        # kx = np.fft.fftfreq(m) / dx
-        # kx[0] = 1
+        kx = np.fft.fftfreq(m) / dx
+        kx[0] = 1
         phi_fft = (
             -0.5 * rho_fft / ((np.cos(2.0 * np.pi * kx / (m)) - 1.0) / dx ** 2)
         )

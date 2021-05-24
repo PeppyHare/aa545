@@ -450,42 +450,6 @@ def plot_traces(
     return ax_energy
 
 
-def _animate_frame(
-    frame,
-    x_hist,
-    vx_hist,
-    vy_hist,
-    efield_hist,
-    x_j,
-    x_min,
-    L,
-    pt_xv1,
-    pt_xv2,
-    pt_vv1,
-    pt_vv2,
-    pt_efield,
-    time_text,
-    vline_t,
-    subsample_ratio,
-    dt,
-):
-    current_time = frame * dt * subsample_ratio
-    time_text.set_text(f"t = {current_time:.2f}")
-    vline_t.set_xdata([current_time, current_time])
-    N = x_hist.shape[0]
-    n2 = math.ceil(N / 2)
-    pt_xv1.set_data((x_hist[:n2, frame] * L) + x_min, (vx_hist[:n2, frame] * L))
-    pt_vv1.set_data((vx_hist[:n2, frame] * L), (vy_hist[:n2, frame] * L))
-    if n2 > 0:
-        pt_xv2.set_data(
-            (x_hist[n2:, frame] * L) + x_min, (vx_hist[n2:, frame] * L)
-        )
-        pt_vv2.set_data((vx_hist[n2:, frame] * L), (vy_hist[n2:, frame] * L))
-    pt_efield.set_data((x_j * L) + x_min, efield_hist[:, frame])
-
-    return (pt_xv1, pt_xv2, pt_vv1, pt_vv2, time_text, vline_t, pt_efield)
-
-
 def animate_phase_space(
     m: PicModel,
     plot_title="Phase space animation",
@@ -524,17 +488,20 @@ def animate_phase_space(
     vx_range = (np.min(d.vx_hist) * 1.2 * c.L, np.max(d.vx_hist) * 1.2 * c.L)
     ax_xv.set_ylim(vx_range)
 
-    ax_vv.set_title("Velocity space animation")
     if is_1d:
-        ax_vv.set_ylabel(r"$v_x$")
-        ax_vv.set_xlabel(r"$x$")
-        ax_vv.set_xlim(x_range)
-        ax_vv.set_ylim(vx_range)
+        ax_vv.set_title("Velocity Distribution")
+        ax_vv.set_ylabel(r"$f(v_x)$")
+        ax_vv.set_xlabel(r"$v_x$")
+        ax_vv.set_xlim((vx_range[0], vx_range[1]))
     else:
+        ax_vv.set_title("Velocity space animation")
         ax_vv.set_ylabel(r"$v_y$")
         ax_vv.set_xlabel(r"$v_x$")
         ax_vv.set_xlim(vx_range)
-        vy_range = (np.min(d.vy_hist) * 1.2 * c.L, np.max(d.vy_hist) * 1.2 * c.L)
+        vy_range = (
+            np.min(d.vy_hist) * 1.2 * c.L,
+            np.max(d.vy_hist) * 1.2 * c.L,
+        )
         if vy_range[1] - vy_range[0] > 10 ** -12:
             ax_vv.set_ylim(vy_range)
 
@@ -542,7 +509,7 @@ def animate_phase_space(
     vline_t = ax_energy.axvline(0, ls="--", color="darkgray", zorder=10)
 
     ax_efield.set_title("Electric field")
-    ax_efield.set_ylabel(r"$E$")
+    ax_efield.set_ylabel(r"$E_x$")
     ax_efield.set_xlabel(r"$x$")
     ax_efield.set_xlim(x_range)
     ax_efield.set_ylim(np.min(d.ex_hist), np.max(d.ex_hist))
@@ -561,46 +528,107 @@ def animate_phase_space(
         color="tab:cyan",
         markersize=markersize,
     )
-
-    (pt_vv1,) = ax_vv.plot(
-        [],
-        [],
-        ".",
-        color="tab:orange",
-        markersize=markersize,
-    )
-    (pt_vv2,) = ax_vv.plot(
-        [],
-        [],
-        ".",
-        color="tab:cyan",
-        markersize=markersize,
-    )
+    if is_1d:
+        vx_bins = np.linspace(vx_range[0], vx_range[1], 100)
+        vx_weight = np.ones_like(d.vx_hist[:, 0]) / c.N
+        _, _, vx_bar_container = ax_vv.hist(
+            d.vx_hist[:, 0],
+            bins=vx_bins,
+            weights=vx_weight,
+            log=True,
+            color="tab:orange",
+        )
+        ax_vv.set_ylim(10 ** -4, 1)
+    else:
+        (pt_vv1,) = ax_vv.plot(
+            [],
+            [],
+            ".",
+            color="tab:orange",
+            markersize=markersize,
+        )
+        (pt_vv2,) = ax_vv.plot(
+            [],
+            [],
+            ".",
+            color="tab:cyan",
+            markersize=markersize,
+        )
 
     (pt_efield,) = ax_efield.plot([], [], "-", color="tab:green", label="E")
 
     # Add a label to the frame showing the current time. Updated each time step
     # in update()
     time_text = ax_xv.text(0.02, 0.95, "", transform=ax_xv.transAxes)
-    animate = partial(
-        _animate_frame,
-        x_hist=d.x_hist,
-        vx_hist=d.vx_hist,
-        vy_hist=d.vy_hist,
-        efield_hist=d.ex_hist,
-        x_j=c.x_j,
-        x_min=c.x_min,
-        L=c.L,
-        pt_xv1=pt_xv1,
-        pt_xv2=pt_xv2,
-        pt_vv1=pt_vv1,
-        pt_vv2=pt_vv2,
-        pt_efield=pt_efield,
-        time_text=time_text,
-        vline_t=vline_t,
-        subsample_ratio=c.subsample_ratio,
-        dt=dt,
-    )
+
+    def animate(frame):
+        current_time = frame * dt * c.subsample_ratio
+        time_text.set_text(f"t = {current_time:.2f}")
+        vline_t.set_xdata([current_time, current_time])
+        N = d.x_hist.shape[0]
+        n2 = math.ceil(N / 2)
+        pt_xv1.set_data(
+            (d.x_hist[:n2, frame] * c.L) + c.x_min,
+            (d.vx_hist[:n2, frame] * c.L),
+        )
+        if is_1d:
+            n, _ = np.histogram(d.vx_hist[:, frame] * c.L, vx_bins)
+            for count, rect in zip(n, vx_bar_container.patches):
+                rect.set_height(count / c.N)
+        else:
+            pt_vv1.set_data(
+                (d.vx_hist[:n2, frame] * c.L), (d.vy_hist[:n2, frame] * c.L)
+            )
+        if n2 > 0:
+            pt_xv2.set_data(
+                (d.x_hist[n2:, frame] * c.L) + c.x_min,
+                (d.vx_hist[n2:, frame] * c.L),
+            )
+            if not is_1d:
+                pt_vv2.set_data(
+                    (d.vx_hist[n2:, frame] * c.L), (d.vy_hist[n2:, frame] * c.L)
+                )
+        pt_efield.set_data((c.x_j * c.L) + c.x_min, d.ex_hist[:, frame])
+        if is_1d:
+            artists = [
+                pt_xv1,
+                pt_xv2,
+                time_text,
+                vline_t,
+                pt_efield,
+            ]
+            artists.extend(vx_bar_container.patches)
+            return tuple(artists)
+        else:
+            return (
+                pt_xv1,
+                pt_xv2,
+                pt_vv1,
+                pt_vv2,
+                time_text,
+                vline_t,
+                pt_efield,
+            )
+
+    # animate = partial(
+    #     _animate_frame,
+    #     x_hist=d.x_hist,
+    #     vx_hist=d.vx_hist,
+    #     vy_hist=d.vy_hist,
+    #     efield_hist=d.ex_hist,
+    #     x_j=c.x_j,
+    #     x_min=c.x_min,
+    #     L=c.L,
+    #     pt_xv1=pt_xv1,
+    #     pt_xv2=pt_xv2,
+    #     pt_vv1=pt_vv1,
+    #     pt_vv2=pt_vv2,
+    #     pt_efield=pt_efield,
+    #     time_text=time_text,
+    #     vline_t=vline_t,
+    #     subsample_ratio=c.subsample_ratio,
+    #     dt=dt,
+    # )
 
     # TODO: Make sure the history vectors are properly sized
     last_frame = d.x_hist.shape[1]

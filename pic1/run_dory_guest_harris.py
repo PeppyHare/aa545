@@ -95,6 +95,7 @@ def run_dgh(param, wc=10 ** (-1 / 2), wp=1, k=1, n_periods=30):
             f"Dory-Guest-Harris Instability: $k v_0 / \omega_c = {param:.2f}$"
         ),
         repeat=True,
+        is_1d=False,
         hold=True,
     )
     # Save the data!
@@ -119,5 +120,6 @@ if __name__ == "__main__":
                 "Dory-Guest-Harris Instability: $k v_0 / \omega_c = 5.5$"
             ),
             repeat=True,
+            is_1d=False,
             hold=True,
         )

@@ -1,6 +1,7 @@
 """Run Ideal MHD Solver."""
 import math
 import itertools
+import os
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -13,6 +14,7 @@ import mhd1.plots as plots
 
 
 plt.style.use("dark_background")  # For comfortable nighttime coding
+demo_mode = True
 
 
 class RiemannShockConfiguration(Configuration):
@@ -222,28 +224,37 @@ class ScrewPinchConfiguration(Configuration):
         self.initial_Q = Q
 
 
-c = ScrewPinchConfiguration(Mx=65, My=65, Mz=65, dt=0.05, t_max=10, j0=0.5, R=8)
-m = MHDModel(c, check_divB=True)
-plots.plot_initial_distribution_all_axes(m)
-
-m.run()
-save_data(m, "screw_pinch_latest.p")
-
-# m = load_data("saved_data/mhd1/2021-05-21_82451.590781_screw_pinch_latest.p")
-
-plots.animate_mhd(m)
-plots.mhd_snapshot(m, 3)
-
-
-c = RiemannShockConfiguration()
-m = MHDModel(c, check_divB=False)
-m.run()
-save_data(m, "riemann_shock.p")
-
-# m = load_data("saved_data/mhd1/2021-05-21_76895.019152_riemann_shock.p")
-
-plots.shock_snapshots(m, n=0)
-plots.shock_snapshots(m, n=2)
-plots.shock_snapshots(m, n=5)
+if demo_mode:
+    m = load_data(
+        os.path.join(
+            "saved_data", "mhd1", "2021-05-23_82950.727576_riemann_shock.p"
+        )
+    )
+else:
+    c = RiemannShockConfiguration()
+    m = MHDModel(c, check_divB=False)
+    m.run()
+    save_data(m, "riemann_shock.p")
 
 plots.plot_shock(m)
+
+
+if demo_mode:
+    m = load_data(
+        os.path.join(
+            "saved_data", "mhd1", "2021-05-23_83581.340669_screw_pinch_latest.p"
+        )
+    )
+else:
+    c = ScrewPinchConfiguration(
+        Mx=65, My=65, Mz=65, dt=0.05, t_max=10, j0=0.5, R=8
+    )
+    m = MHDModel(c, check_divB=True)
+    plots.plot_initial_distribution_all_axes(m)
+
+    m.run()
+    save_data(m, "screw_pinch_latest.p")
+
+
+plots.animate_mhd(m)
+# plots.mhd_snapshot(m, 3)

@@ -14,8 +14,8 @@ def F(Q: npt.ArrayLike):
     dQ/dt + dF/dx + dG/dy + dH/dz = 0
     """
     F = np.zeros_like(Q)
-    gamma = 5 / 3  # For 3D problems
-    # gamma = 2  # For 1D problems
+    # gamma = 5 / 3  # For 3D problems
+    gamma = 2  # For 1D problems
     mu = 1.0
     # What happens when Q[0] == 0? Best not to think about it...
     rvsq = (Q[1] ** 2 + Q[2] ** 2 + Q[3] ** 2) / Q[0]  # rho * v^2
@@ -44,8 +44,8 @@ def G(Q: npt.ArrayLike):
     dQ/dt + dF/dx + dG/dy + dH/dz = 0
     """
     G = np.zeros_like(Q)
-    gamma = 5 / 3  # For 3D problems
-    # gamma = 2  # For 1D problems
+    # gamma = 5 / 3  # For 3D problems
+    gamma = 2  # For 1D problems
     # return G  # Useful short-circuit for decreasing dimensionality
     mu = 1.0
     # What happens when Q[0] == 0? Best not to think about it...
@@ -76,8 +76,8 @@ def H(Q: npt.ArrayLike):
     dQ/dt + dF/dx + dG/dy + dH/dz = 0
     """
     H = np.zeros_like(Q)
-    gamma = 5 / 3  # For 3D problems
-    # gamma = 2  # For 1D problems
+    # gamma = 5 / 3  # For 3D problems
+    gamma = 2  # For 1D problems
     # return H  # Useful short-circuit for decreasing dimensionality
     mu = 1.0
     # What happens when Q[0] == 0? Best not to think about it...
@@ -304,8 +304,8 @@ def calc_cfl(Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float):
 
     # The largest wave speed is the fluid velocity plus the fast alfven
     # speed
-    gamma = 5 / 3  # For 3D problems
-    # gamma = 2  # For 1D problems
+    # gamma = 5 / 3  # For 3D problems
+    gamma = 2  # For 1D problems
     mu = 1.0
 
     # Square of the Alfven speed
