@@ -5,7 +5,7 @@ import numpy.typing as npt
 import numba
 
 
-@numba.njit(boundscheck=True, nogil=True)
+@numba.njit(boundscheck=True, nogil=True, parallel=False, fastmath=True)
 def F(Q: npt.ArrayLike):
     """Calculate MHD flux term in the x-direction.
 
@@ -35,7 +35,9 @@ def F(Q: npt.ArrayLike):
     return F
 
 
-@numba.njit(boundscheck=True, nogil=True, cache=False)
+@numba.njit(
+    boundscheck=True, nogil=True, cache=True, parallel=False, fastmath=True
+)
 def G(Q: npt.ArrayLike):
     """Calculate MHD flux term in the y-direction.
 
@@ -67,7 +69,9 @@ def G(Q: npt.ArrayLike):
     return G
 
 
-@numba.njit(boundscheck=True, nogil=True, cache=False)
+@numba.njit(
+    boundscheck=True, nogil=True, cache=True, parallel=False, fastmath=True
+)
 def H(Q: npt.ArrayLike):
     """Calculate MHD flux term in the z-direction.
 
@@ -99,7 +103,9 @@ def H(Q: npt.ArrayLike):
     return H
 
 
-@numba.njit(boundscheck=True, nogil=True, cache=True)
+@numba.njit(
+    boundscheck=True, nogil=True, cache=True, parallel=False, fastmath=True
+)
 def maccormack_time_step(
     Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float
 ):
@@ -113,28 +119,32 @@ def maccormack_time_step(
     Mz = Q.shape[3]
     # Predictor step first
     pred = np.copy(Q)
-    for i in numba.prange(0, Mx - 1):
+    # for i in numba.prange(0, Mx - 1):
+    for i in range(0, Mx - 1):
         pred[:, i, :, :] -= dt / dx * (F(Q[:, i + 1, :, :]) - F(Q[:, i, :, :]))
     # Conducting walls in x
     pred[1, 0, :, :] = 0
     pred[1, Mx - 1, :, :] = 0
     pred[4, 0, :, :] = Q[4, 0, :, :]
     pred[4, Mx - 1, :, :] = Q[4, Mx - 1, :, :]
-    for j in numba.prange(0, My - 1):
+    # for j in numba.prange(0, My - 1):
+    for j in range(0, My - 1):
         pred[:, :, j, :] -= dt / dy * (F(Q[:, :, j + 1, :]) - F(Q[:, :, j, :]))
     # Conducting walls in y
     pred[2, :, 0, :] = 0
     pred[2, :, My - 1, :] = 0
     pred[5, :, 0, :] = Q[5, :, 0, :]
     pred[5, :, My - 1, :] = Q[5, :, My - 1, :]
-    for k in numba.prange(0, Mz - 1):
+    # for k in numba.prange(0, Mz - 1):
+    for k in range(0, Mz - 1):
         pred[:, :, :, k] -= dt / dz * (F(Q[:, :, :, k + 1]) - F(Q[:, :, :, k]))
     # Periodic boundary in z
     pred[:, :, :, Mz - 1] -= dt / dz * (F(Q[:, :, :, 0]) - F(Q[:, :, :, k]))
 
     # Corrector step
     corr = np.copy(Q)
-    for i2 in numba.prange(1, Mx):
+    # for i2 in numba.prange(1, Mx):
+    for i2 in range(1, Mx):
         corr[:, i2, :, :] -= (
             dt / dx * (F(pred[:, i2, :, :]) - F(pred[:, i2 - 1, :, :]))
         )
@@ -143,7 +153,8 @@ def maccormack_time_step(
     corr[1, Mx - 1, :, :] = 0
     corr[4, 0, :, :] = Q[4, 0, :, :]
     corr[4, Mx - 1, :, :] = Q[4, Mx - 1, :, :]
-    for j2 in numba.prange(1, My):
+    # for j2 in numba.prange(1, My):
+    for j2 in range(1, My):
         corr[:, :, j2, :] -= (
             dt / dy * (F(pred[:, :, j2, :]) - F(pred[:, :, j2 - 1, :]))
         )
@@ -152,7 +163,8 @@ def maccormack_time_step(
     corr[2, :, My - 1, :] = 0
     corr[5, :, 0, :] = Q[5, :, 0, :]
     corr[5, :, My - 1, :] = Q[5, :, My - 1, :]
-    for k2 in numba.prange(1, Mz):
+    # for k2 in numba.prange(1, Mz):
+    for k2 in range(1, Mz):
         corr[:, :, :, k2] -= (
             dt / dz * (F(pred[:, :, :, k2]) - F(pred[:, :, :, k2 - 1]))
         )
@@ -164,7 +176,8 @@ def maccormack_time_step(
     visc = 0.1 * dx ** 2 / dt
     # Add artificial diffusion
     if diffusion_method == "pre_avg":
-        for i in numba.prange(1, Mx - 1):
+        # for i in numba.prange(1, Mx - 1):
+        for i in range(1, Mx - 1):
             pred[:, i, :, :] += (
                 visc
                 * dt
@@ -185,7 +198,8 @@ def maccormack_time_step(
                     + corr[:, i - 1, :, :]
                 )
             )
-        for j in numba.prange(0, My - 1):
+        # for j in numba.prange(0, My - 1):
+        for j in range(0, My - 1):
             pred[:, :, j, :] += (
                 visc
                 * dt
@@ -206,7 +220,8 @@ def maccormack_time_step(
                     + corr[:, :, j - 1, :]
                 )
             )
-        for k in numba.prange(0, Mz):
+        # for k in numba.prange(0, Mz):
+        for k in range(0, Mz):
             pred[:, :, k, :] += (
                 visc
                 * dt
@@ -230,21 +245,24 @@ def maccormack_time_step(
 
     Q += (pred + corr) / 2 - Q
     if diffusion_method == "post_avg":
-        for i in numba.prange(1, Mx - 1):
+        # for i in numba.prange(1, Mx - 1):
+        for i in range(1, Mx - 1):
             Q[:, i, :, :] += (
                 visc
                 * dt
                 / dx ** 2
                 * (Q[:, i + 1, :, :] - 2 * Q[:, i, :, :] + Q[:, i - 1, :, :])
             )
-        for j in numba.prange(0, My - 1):
+        # for j in numba.prange(0, My - 1):
+        for j in range(0, My - 1):
             Q[:, :, j, :] += (
                 visc
                 * dt
                 / dy ** 2
                 * (Q[:, :, j + 1, :] - 2 * Q[:, :, j, :] + Q[:, :, j - 1, :])
             )
-        for k in numba.prange(0, Mz):
+        # for k in numba.prange(0, Mz):
+        for k in range(0, Mz):
             Q[:, :, k, :] += (
                 visc
                 * dt
@@ -257,7 +275,7 @@ def maccormack_time_step(
             )
 
 
-@numba.njit(boundscheck=True, nogil=True)
+@numba.njit(boundscheck=True, nogil=True, parallel=True, fastmath=True)
 def divB(
     B: npt.ArrayLike,
     dx: float,
@@ -278,19 +296,22 @@ def divB(
     My = B.shape[2]
     Mz = B.shape[3]
     div = np.zeros_like(B[0])
-    for i in numba.prange(1, Mx - 1):
+    # for i in numba.prange(1, Mx - 1):
+    for i in range(1, Mx - 1):
         div[i] += (B[0, i + 1] - B[0, i - 1]) / (2 * dx)
     if bcx == 0:  # periodic BC
         div[0] += (B[0, 1] - B[0, Mx - 1]) / (2 * dx)
         div[Mx - 1] += (B[0, 0] - B[0, Mx - 2]) / (2 * dx)
 
-    for j in numba.prange(1, My - 1):
+    # for j in numba.prange(1, My - 1):
+    for j in range(1, My - 1):
         div[:, j] += (B[1, :, j + 1] - B[1, :, j - 1]) / (2 * dy)
     if bcy == 0:  # periodic BC
         div[:, 0] += (B[1, :, 1] - B[1, :, My - 1]) / (2 * dy)
         div[:, My - 1] += (B[1, :, 0] - B[1, :, My - 2]) / (2 * dy)
 
-    for k in numba.prange(1, Mz - 1):
+    # for k in numba.prange(1, Mz - 1):
+    for k in range(1, Mz - 1):
         div[:, :, k] += (B[2, :, :, k + 1] - B[2, :, :, k - 1]) / (2 * dz)
     if bcz == 0:  # periodic BC
         div[:, :, 0] += (B[2, :, :, 1] - B[2, :, :, Mz - 1]) / (2 * dz)
@@ -298,7 +319,7 @@ def divB(
     return div
 
 
-@numba.njit(boundscheck=True, nogil=True)
+@numba.njit(boundscheck=True, nogil=True, parallel=False, fastmath=True)
 def calc_cfl(Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float):
     """Calculate the maximium value of the CFL constant in each direction."""
 

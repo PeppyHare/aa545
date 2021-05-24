@@ -776,4 +776,6 @@ def mhd_snapshot(m: MHDModel, n: int):
         plt.colorbar(bz_yz, ax=[ax_bz_xy, ax_bz_yz])
 
     save_plot(f"mhd_snapshot_n_{n}.pdf")
+    mng = plt.get_current_fig_manager()
+    mng.window.state("zoomed")
     plt.show()

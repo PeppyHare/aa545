@@ -50,13 +50,15 @@ class RiemannShockConfiguration(Configuration):
         mu = 1
 
         # Bx = 0.75 everywhere
-        Bx = 0.75
+        Bx = 0
+        # Bx = 0.75
         Q[4, :, :, :] = Bx
 
         # Left state
         rho_l = 1
         p_l = 1
-        By_l = 1
+        # By_l = 1
+        By_l = 0
         Q[0, :x2, :, :] = rho_l
         Q[5, :x2, :, :] = By_l
         Q[7, :x2, :, :] = p_l / (gamma - 1) + (Bx ** 2 + By_l ** 2) / (2 * mu)
@@ -64,7 +66,8 @@ class RiemannShockConfiguration(Configuration):
         # Right state
         rho_r = 0.125
         p_r = 0.1
-        By_r = -1
+        # By_r = -1
+        By_r = -0
         Q[0, x2:, :, :] = rho_r
         Q[5, x2:, :, :] = By_r
         Q[7, x2:, :, :] = p_r / (gamma - 1) + (Bx ** 2 + By_r ** 2) / (2 * mu)
@@ -236,6 +239,8 @@ else:
     m.run()
     save_data(m, "riemann_shock.p")
 
+plots.mhd_snapshot(m, n=5)
+plots.shock_snapshots(m, n=0)
 plots.plot_shock(m)
 
 
@@ -256,5 +261,5 @@ else:
     save_data(m, "screw_pinch_latest.p")
 
 
+plots.mhd_snapshot(m, 0)
 plots.animate_mhd(m)
-# plots.mhd_snapshot(m, 3)
