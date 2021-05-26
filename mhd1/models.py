@@ -6,8 +6,13 @@ import numpy as np
 import progressbar
 import tables
 
-from mhd1.configuration import Configuration, GridData
-from mhd1.methods import divB, calc_cfl
+from mhd1.configuration import (
+    Configuration,
+    CylindricalConfiguration,
+    GridData,
+    CylindricalGridData,
+)
+from mhd1.methods import divB, calc_cfl, linear_mhd_time_step
 
 
 class MHDModel:
@@ -117,6 +122,105 @@ class MHDModel:
                     )
                 )
                 # print(f"max_divB: {self.d.max_divB[n]}")
+            if showprogress:
+                bar.update(n)
+        if showprogress:
+            bar.finish()
+        end_time = time.perf_counter()
+        print(
+            f"Done! Took {(end_time - start_time):.2f}s. Timeseries"
+            f" data saved to {self.d.h5_filename}"
+        )
+        self.has_run = True
+
+
+class LinearMHDModel:
+    """Solve the time-dependent linear MHD equations."""
+
+    has_run = False
+
+    def __init__(self, c: CylindricalConfiguration, check_divB=False):
+        """Initialize model."""
+        self.c = c
+        self.d = CylindricalGridData(c)
+        self.check_divB = check_divB
+
+    def run(self, showprogress=True):
+        """Run the simulation."""
+        c = self.c
+        d = self.d
+        if showprogress:
+            print("Simulating...")
+            bar = progressbar.ProgressBar(
+                maxval=c.t_steps,
+                widgets=[
+                    progressbar.Bar("=", "[", "]"),
+                    " ",
+                    progressbar.Percentage(),
+                ],
+            )
+            bar.start()
+        start_time = time.perf_counter()
+        for n in range(c.t_steps):
+            linear_mhd_time_step(
+                v=d.v,
+                b=d.b,
+                p=d.p,
+                dr=c.dr,
+                dz=c.dz,
+                dt=d.dt,
+                p0=c.p0,
+                rho0=c.rho0,
+                b0r=c.b0r,
+                b0t=c.b0t,
+                b0z=c.b0z,
+                db0rdr=c.db0rdr,
+                db0rdz=c.db0rdz,
+                db0tdr=c.db0tdr,
+                db0tdz=c.db0tdz,
+                db0zdr=c.db0zdr,
+                db0zdz=c.db0zdz,
+            )
+            if n % c.subsample_ratio == 0 and n > 0:
+                # Write current state to disk
+                d.write_out_data()
+
+                # Check for CFL condition
+                # (cfl_x, cfl_y, cfl_z) = calc_cfl(d.Q, c.dx, c.dy, c.dz, c.dt)
+                # print(
+                #     f"Current CFL numbers: Cx={cfl_x:.3f}, Cy={cfl_y:.3f},"
+                #     f" Cz={cfl_z:.3f}"
+                # )
+                # if cfl_x >= 1 or cfl_y >= 1 or cfl_z >= 1:
+                #     print("CFL condition violated!")
+                #     break
+
+            # # Calculate total energy
+            # self.d.TE[n] += np.sum(d.Q[7])
+            # # Calculate total kinetic energy
+            # self.d.KE[n] += np.sum(
+            #     (d.Q[1] ** 2 + d.Q[2] ** 2 + d.Q[3] ** 2) / (2 * d.Q[0])
+            # )
+            # # Calculate total magnetic field energy
+            # self.d.FE[n] += np.sum(d.Q[4] ** 2 + d.Q[5] ** 2 + d.Q[6] ** 2) / (
+            #     2 * c.mu
+            # )
+            # Check the maximum divergence of B
+            # if self.check_divB:
+            #     self.d.max_divB[n] += np.max(
+            #         np.abs(
+            #             divB(
+            #                 d.Q[4:7],
+            #                 dx=c.dx,
+            #                 dy=c.dy,
+            #                 dz=c.dz,
+            #                 bcx=c.bcx,
+            #                 bcy=c.bcy,
+            #                 bcz=c.bcz,
+            #             )
+            #         )
+            #     )
+            # print(f"max_divB: {self.d.max_divB[n]}")
             if showprogress:
                 bar.update(n)
         if showprogress:

@@ -372,3 +372,170 @@ def calc_cfl(Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float):
     cfl_y = np.max(np.abs(Q[2] / Q[0]) + vf_y) * dt / dy
     cfl_z = np.max(np.abs(Q[3] / Q[0]) + vf_z) * dt / dz
     return np.array([cfl_x, cfl_y, cfl_z])
+
+
+@numba.njit(fastmath=True, cache=True, parallel=False)
+def linear_mhd_time_step(
+    v: npt.ArrayLike,
+    b: npt.ArrayLike,
+    p: npt.ArrayLike,
+    dr: float,
+    dz: float,
+    dt: float,
+    p0: npt.ArrayLike,
+    rho0: npt.ArrayLike,
+    b0r: npt.ArrayLike,
+    b0t: npt.ArrayLike,
+    b0z: npt.ArrayLike,
+    db0rdr: npt.ArrayLike,
+    db0rdz: npt.ArrayLike,
+    db0tdr: npt.ArrayLike,
+    db0tdz: npt.ArrayLike,
+    db0zdr: npt.ArrayLike,
+    db0zdz: npt.ArrayLike,
+):
+    """Evolve the time-dependent linear MHD equations forward in time.
+
+    [b0r, b0t, b0z]: Equilibrium magnetic field
+    [db0rdr, db0tdr, db0zdr]: Gradient of b0 in the radial direction
+    [db0zdr, db0zdt, db0zdz]: Gradient of b0 in the z direction
+
+    This time step is implemented for a pressure-less, cylindrical geometry. The
+    equilibrium pressure is zero, and it is assumed that b0 is axially
+    symmetric, that is, the gradient in the theta direction is zero.
+    """
+
+    Mr = v.shape[1]
+    Mz = v.shape[2]
+
+    # TODO: parameterize azimuthal mode
+    m = 1
+
+    # TODO: parameterize mu0
+    mu = 1.0
+
+    # TODO: parameterize gamma
+    gamma = 5 / 3
+
+    dv = np.zeros_like(v)
+    db = np.zeros_like(b)
+    dp = np.zeros_like(p)
+    for j in range(1, Mr - 1):
+        r = j * dr
+        for k in range(1, Mz - 1):
+            # z = k * dz
+            dv[0, j, k] += (
+                dt
+                / rho0[j, k]
+                * (
+                    (p[j + 1, k] - p[j - 1, k]) / (2 * dr)
+                    + 1
+                    / (mu * r)
+                    * (
+                        (r * b[2, j, k]) * (db0rdz[j, k] - db0zdr[j, k])
+                        - (r * b[2, j, k] * db0tdr[j, k])
+                        + (r * b0z[j, k])
+                        * (
+                            (b[0, j, k + 1] - b[0, j, k - 1]) / (2 * dz)
+                            - (b[2, j + 1, k] - b[2, j - 1, k]) / (2 * dr)
+                        )
+                        + b0t[j, k]
+                        * (
+                            -2 * b[1, j, k]
+                            + 1j * m * b[0, j, k]
+                            - r * (b[1, j + 1, k] - b[1, j - 1, k]) / (2 * dr)
+                        )
+                    )
+                )
+            )
+            dv[1, j, k] += (dt / r) * (
+                1j * m * p[j, k]
+                + 1
+                / mu
+                * (
+                    b[2, j, k] * r * db0tdz[j, k]
+                    + b0r[j, k] * (b[2, j, k] - 1j * m * b[0, j, k])
+                    + b0z[j, k]
+                    * (
+                        r * (b[1, j, k + 1] - b[1, j, k - 1]) / (2 * dz)
+                        - 1j * m * b[2, j, k]
+                    )
+                    + r * b[0, j, k] * db0tdr[j, k]
+                )
+            )
+            dv[2, j, k] += dt * (
+                (p[j, k + 1] - p[j, k - 1]) / (2 * dz)
+                + 1
+                / mu
+                * (
+                    b[0, j, k] * (db0zdr[j, k] - db0rdz[j, k])
+                    + 1
+                    / r
+                    * (
+                        -b[1, j, k] * r * db0tdz[j, k]
+                        + b0t[j, k]
+                        * (
+                            -r * (b[1, j, k + 1] - b[1, j, k - 1]) / (2 * dz)
+                            + 1j * m * b[2, j, k]
+                        )
+                        + r
+                        * b0r[j, k]
+                        * (
+                            (b[2, j + 1, k] - b[2, j - 1, k]) / (2 * dr)
+                            - (b[0, j, k + 1] - b[0, j, k - 1]) / (2 * dz)
+                        )
+                    )
+                )
+            )
+            db[0, j, k] += dt * (
+                -v[2, j, k] * db0rdz[j, k]
+                + 1
+                / r
+                * (
+                    r * b0z[j, k] * (v[0, j, k + 1] - v[0, j, k - 1]) / (2 * dz)
+                    + r * v[0, j, k] * db0zdz[j, k]
+                    + b0t[j, k] * 1j * m * v[0, j, k]
+                    - b0r[j, k]
+                    * (
+                        r * (v[2, j, k + 1] - v[2, j, k - 1]) / (2 * dz)
+                        + 1j * m * v[1, j, k]
+                    )
+                )
+            )
+            db[1, j, k] += dt * (
+                -(v[2, j, k] * db0tdz[j, k])
+                + 1j * m * b0z[j, k] * v[1, j, k]
+                + v[1, j, k] * (db0zdz[j, k] - db0rdr[j, k])
+                - v[0, j, k] * db0tdr[j, k]
+                - b0t[j, k]
+                * (
+                    (v[2, j, k + 1] - v[2, j, k - 1]) / (2 * dz)
+                    + (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+                )
+                + b0r[j, k] * (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+            )
+            db[2, j, k] += (
+                dt
+                / r
+                * (
+                    b0t[j, k] * 1j * m * v[0, j, k]
+                    + v[0, j, k] * db0rdr[j, k]
+                    - r * v[0, j, k] * db0zdr[j, k]
+                    + r
+                    * b0t[j, k]
+                    * (v[2, j + 1, k] - v[2, j - 1, k])
+                    / (2 * dr)
+                    - b0z[j, k]
+                    * (
+                        v[0, j, k]
+                        + 1j * m * v[1, j, k]
+                        + r * (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+                    )
+                )
+            )
+            dp[j, k] += -dt * (
+                ((r + dr) * v[0, j + 1, k] - (r - dr) * v[0, j - 1, k])
+                / (2 * dr * r)
+                + 1j * m * v[1, j, k] / r
+                + (v[2, j, k + 1] - v[2, j, k - 1]) / (2 * dz)
+            )  # Terms proportional to p0 missing here for pressure-free eq.
