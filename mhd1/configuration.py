@@ -126,7 +126,7 @@ class CylindricalConfiguration:
     L = 2
 
     # Time step
-    dt = 0.5
+    dt = 0.05
 
     # Adiabatic index
     gamma = 5 / 3
@@ -148,7 +148,7 @@ class CylindricalConfiguration:
 
     # Max number of time steps to write to disk.
     # If t_steps greater than this, subsampling will occur.
-    max_history_steps = 32
+    max_history_steps = 1000
 
     def __init__(self):
         """Return a valid configuration for MHDModel."""
