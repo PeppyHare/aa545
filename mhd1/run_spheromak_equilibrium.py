@@ -22,7 +22,7 @@ class SpheromakConfiguration(CylindricalConfiguration):
     """Linearized m=1 Spheromak equilibrium."""
 
     dt = 0.001
-    t_max = 0.005
+    t_max = 5
     # Number of grid points in r
     Mr = 11
 
@@ -81,7 +81,7 @@ class SpheromakConfiguration(CylindricalConfiguration):
         self.rho0 = np.ones((self.Mr, self.Mz))
 
 
-c = SpheromakConfiguration(R=1.0, L=1.0)
+c = SpheromakConfiguration(R=1.0, L=2.0)
 m = LinearMHDModel(c)
 m.run()
 save_data(m, "mhd_spheromak_test.p")
