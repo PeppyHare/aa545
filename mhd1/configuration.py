@@ -148,7 +148,7 @@ class CylindricalConfiguration:
 
     # Max number of time steps to write to disk.
     # If t_steps greater than this, subsampling will occur.
-    max_history_steps = 1000
+    max_history_steps = 100
 
     def __init__(self):
         """Return a valid configuration for MHDModel."""

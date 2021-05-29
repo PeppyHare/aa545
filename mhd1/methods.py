@@ -374,7 +374,7 @@ def calc_cfl(Q: npt.ArrayLike, dx: float, dy: float, dz: float, dt: float):
     return np.array([cfl_x, cfl_y, cfl_z])
 
 
-@numba.njit(fastmath=True, cache=True, parallel=False)
+@numba.njit(fastmath=True, cache=False, parallel=False, boundscheck=True)
 def linear_mhd_time_step(
     v: npt.ArrayLike,
     b: npt.ArrayLike,
@@ -420,9 +420,18 @@ def linear_mhd_time_step(
     dv = np.zeros_like(v)
     db = np.zeros_like(b)
     dp = np.zeros_like(p)
+
+    # Axisymmetric boundary conditions at r=0
+    # v[1, 0, :] = 1j * v[0, 0, :]
+    # b[1, 0, :] = 1j * b[0, 0, :]
+    v[2, 0, :] = 0
+    b[2, 0, :] = 0
+    v[0, -1, :] = 0
+    b[0, -1, :] = 0
+
     for j in range(1, Mr - 1):
         r = j * dr
-        for k in range(0, Mz):
+        for k in range(1, Mz - 1):
             dv[0, j, k] += (
                 dt
                 / rho0[j, k]
@@ -432,7 +441,7 @@ def linear_mhd_time_step(
                     / (mu * r)
                     * (
                         (r * b[2, j, k]) * (db0rdz[j, k] - db0zdr[j, k])
-                        - (r * b[2, j, k] * db0tdr[j, k])
+                        - (r * b[1, j, k] * db0tdr[j, k])
                         + (r * b0z[j, k])
                         * (
                             (b[0, j, k + 1] - b[0, j, k - 1]) / (2 * dz)
@@ -447,22 +456,26 @@ def linear_mhd_time_step(
                     )
                 )
             )
-            dv[1, j, k] += (dt / r) * (
+            dv[1, j, k] += (dt / r * rho0[j, k]) * (
                 1j * m * p[j, k]
                 + 1
                 / mu
                 * (
                     b[2, j, k] * r * db0tdz[j, k]
-                    + b0r[j, k] * (b[2, j, k] - 1j * m * b[0, j, k])
+                    + b0r[j, k] * (b[1, j, k] - 1j * m * b[0, j, k])
                     + b0z[j, k]
                     * (
                         r * (b[1, j, k + 1] - b[1, j, k - 1]) / (2 * dz)
                         - 1j * m * b[2, j, k]
                     )
                     + r * b[0, j, k] * db0tdr[j, k]
+                    + b[0, j, k] * b0t[j, k]
+                    + (r * b0r[j, k])
+                    * (b[1, j + 1, k] - b[1, j - 1, k])
+                    / (2 * dr)
                 )
             )
-            dv[2, j, k] += dt * (
+            dv[2, j, k] += (dt / rho0[j, k]) * (
                 (p[j, k + 1] - p[j, k - 1]) / (2 * dz)
                 + 1
                 / mu
@@ -532,17 +545,17 @@ def linear_mhd_time_step(
                     )
                 )
             )
-            dp[j, k] += (
-                -dt
-                * p0[j, k]
-                * gamma
-                * (
-                    ((r + dr) * v[0, j + 1, k] - (r - dr) * v[0, j - 1, k])
-                    / (2 * dr * r)
-                    + 1j * m * v[1, j, k] / r
-                    + (v[2, j, k + 1] - v[2, j, k - 1]) / (2 * dz)
-                )
-            )
+            # dp[j, k] += (
+            #     -dt
+            #     * p0[j, k]
+            #     * gamma
+            #     * (
+            #         ((r + dr) * v[0, j + 1, k] - (r - dr) * v[0, j - 1, k])
+            #         / (2 * dr * r)
+            #         + 1j * m * v[1, j, k] / r
+            #         + (v[2, j, k + 1] - v[2, j, k - 1]) / (2 * dz)
+            #     )
+            # )
 
     # Now we need to do the boundaries
     # At r=R:
@@ -553,13 +566,13 @@ def linear_mhd_time_step(
             dt
             / (rho0[j, k] * r * mu)
             * (
-                b[2, j, k] * r * db0tdz[j, k]
-                + b0r[j, k] * b[1, j, k]
-                + b0z[j, k]
+                r * b0r[j, k] * (b[2, j, k] - b[2, j - 1, k]) / dr
+                + b0t[j, k]
                 * (
-                    r * (b[1, j, k + 1] - b[1, j, k - 1]) / (2 * dz)
-                    - 1j * m * b[2, j, k]
+                    -r * (b[1, j, k + 1] - b[1, j, k - 1]) / (2 * dz)
+                    + 1j * m * b[2, j, k]
                 )
+                - b[1, j, k] * r * db0tdz[j, k]
             )
         )
         dv[2, j, k] += (
@@ -599,17 +612,105 @@ def linear_mhd_time_step(
         #     )
         # )
 
-    # At r=0, we leave the perturbation unchanged
+    # At r=0
+    j = 0
+    for k in range(1, Mz - 1):
+        # Try a very simple d/dr=0 at r=0
+        db[0, j, k] += dt * (
+            b0z[j, k] * (v[0, j, k + 1] - v[0, j, k - 1]) / (2 * dz)
+            + v[0, j, k] * db0zdz[j, k]
+        )
+        db[1, j, k] += dt * (
+            1j * m * b0z[j, k] * v[1, j, k]
+            + v[1, j, k] * (db0zdz[j, k] + db0rdr[j, k])
+            - v[0, j, k] * db0tdr[j, k]
+        )
+        dv[0, j, k] += (
+            dt
+            / (rho0[j, k] * mu)
+            * (
+                -b[1, j, k] * db0tdr[j, k]
+                + b0z[j, k]
+                * (
+                    (b[0, j, k + 1] - b[0, j, k - 1]) / (2 * dz)
+                    - b[2, j + 1, k] / (2 * dr)
+                )
+            )
+        )
+        dv[1, j, k] += (
+            dt
+            / (rho0[j, k] * mu)
+            * (
+                b0z[j, k] * (b[1, j, k + 1] - b[1, j, k - 1]) / (2 * dz)
+                + b[0, j, k] * db0tdr[j, k]
+            )
+        )
+        # dp[j, k] += dp[j + 1, k]
+        # dv[0, j, k] += dv[0, j + 1, k]
+        # dv[0, j, k] += (
+        #     dt
+        #     / (rho0[j, k] * mu)
+        #     * (
+        #         b[2, j, k] * (db0rdz[j, k] - db0zdr[j, k])
+        #         - b[1, j, k] * db0tdr[j, k]
+        #         + b0z[j, k] * (b[0, j, k + 1] - b[0, j, k - 1]) / (2 * dz)
+        #     )
+        # )
+        # dp[j, k] += (
+        #     -gamma
+        #     * p0[j, k]
+        #     * dt
+        #     * (v[2, j, k + 1] - v[2, j, k - 1])
+        #     / (2 * dz)
+        # )
 
     # At z=0 and z=L:
     for j in range(1, Mr - 1):
         r = dr * j
-        for k in [0, Mz - 1]:
-            dv[0, j, k] += (
-                dt
-                / (rho0[j, k] * r * mu)
+        # Boundary z=0
+        k = 0
+        db[0, j, k] += dt * (
+            -v[2, j, k] * db0rdz[j, k]
+            + 1
+            / r
+            * (
+                r * b0z[j, k] * (v[0, j, k + 1] - v[0, j, k]) / (2 * dz)
+                + r * v[0, j, k] * db0zdz[j, k]
+                + b0t[j, k] * 1j * m * v[0, j, k]
+                - b0r[j, k]
                 * (
-                    -r * b[1, j, k] * db0tdr[j, k]
+                    r * (v[2, j, k + 1] - v[2, j, k]) / (2 * dz)
+                    + 1j * m * v[1, j, k]
+                )
+            )
+        )
+        db[1, j, k] += dt * (
+            -(v[2, j, k] * db0tdz[j, k])
+            + 1j * m * b0z[j, k] * v[1, j, k]
+            + v[1, j, k] * (db0zdz[j, k] - db0rdr[j, k])
+            - v[0, j, k] * db0tdr[j, k]
+            - b0t[j, k]
+            * (
+                (v[2, j, k + 1] - v[2, j, k]) / (2 * dz)
+                + (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+            )
+            + b0r[j, k] * (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+        )
+        dv[0, j, k] += (
+            dt
+            / rho0[j, k]
+            * (
+                (p[j + 1, k] - p[j - 1, k]) / (2 * dr)
+                + 1
+                / (mu * r)
+                * (
+                    (r * b[2, j, k]) * (db0rdz[j, k] - db0zdr[j, k])
+                    - (r * b[2, j, k] * db0tdr[j, k])
+                    + (r * b0z[j, k])
+                    * (
+                        (b[0, j, k + 1] - b[0, j, k]) / (2 * dz)
+                        - (b[2, j + 1, k] - b[2, j - 1, k]) / (2 * dr)
+                    )
                     + b0t[j, k]
                     * (
                         -2 * b[1, j, k]
@@ -618,36 +719,123 @@ def linear_mhd_time_step(
                     )
                 )
             )
-            dv[1, j, k] += (
-                dt
-                / (rho0[j, k] * r * mu)
+        )
+        dv[1, j, k] += (dt / r * rho0[j, k]) * (
+            1j * m * p[j, k]
+            + 1
+            / mu
+            * (
+                b[2, j, k] * r * db0tdz[j, k]
+                + b0r[j, k] * (b[1, j, k] - 1j * m * b[0, j, k])
+                + b0z[j, k]
                 * (
-                    b0r[j, k] * (b[1, j, k] - 1j * m * b[0, j, k])
-                    + b[0, j, k] * (b0t[j, k] + r * db0tdr[j, k])
-                    + r
-                    * b0r[j, k]
-                    * (b[1, j + 1, k] - b[1, j - 1, k])
-                    / (2 * dr)
+                    r * (b[1, j, k + 1] - b[1, j, k]) / (2 * dz)
+                    - 1j * m * b[2, j, k]
+                )
+                + r * b[0, j, k] * db0tdr[j, k]
+                + b[0, j, k] * b0t[j, k]
+                + (r * b0r[j, k]) * (b[1, j + 1, k] - b[1, j - 1, k]) / (2 * dr)
+            )
+        )
+
+        # Boundary z=L
+        k = Mz - 1
+        db[0, j, k] += dt * (
+            -v[2, j, k] * db0rdz[j, k]
+            + 1
+            / r
+            * (
+                r * b0z[j, k] * (v[0, j, k] - v[0, j, k - 1]) / (2 * dz)
+                + r * v[0, j, k] * db0zdz[j, k]
+                + b0t[j, k] * 1j * m * v[0, j, k]
+                - b0r[j, k]
+                * (
+                    r * (v[2, j, k] - v[2, j, k - 1]) / (2 * dz)
+                    + 1j * m * v[1, j, k]
                 )
             )
-            db[0, j, k] += (
-                dt
-                / r
+        )
+        db[1, j, k] += dt * (
+            -(v[2, j, k] * db0tdz[j, k])
+            + 1j * m * b0z[j, k] * v[1, j, k]
+            + v[1, j, k] * (db0zdz[j, k] - db0rdr[j, k])
+            - v[0, j, k] * db0tdr[j, k]
+            - b0t[j, k]
+            * (
+                (v[2, j, k] - v[2, j, k - 1]) / (2 * dz)
+                + (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+            )
+            + b0r[j, k] * (v[0, j + 1, k] - v[0, j - 1, k]) / (2 * dr)
+        )
+        dv[0, j, k] += (
+            dt
+            / rho0[j, k]
+            * (
+                (p[j + 1, k] - p[j - 1, k]) / (2 * dr)
+                + 1
+                / (mu * r)
                 * (
-                    r * v[0, j, k] * db0zdz[j, k]
-                    + 1j * m * v[0, j, k] * b0t[j, k]
-                    - b0r[j, k] * 1j * m * v[1, j, k]
+                    (r * b[2, j, k]) * (db0rdz[j, k] - db0zdr[j, k])
+                    - (r * b[2, j, k] * db0tdr[j, k])
+                    + (r * b0z[j, k])
+                    * (
+                        (b[0, j, k] - b[0, j, k - 1]) / (2 * dz)
+                        - (b[2, j + 1, k] - b[2, j - 1, k]) / (2 * dr)
+                    )
+                    + b0t[j, k]
+                    * (
+                        -2 * b[1, j, k]
+                        + 1j * m * b[0, j, k]
+                        - r * (b[1, j + 1, k] - b[1, j - 1, k]) / (2 * dr)
+                    )
                 )
             )
-            db[1, j, k] += dt * (
-                1j * m * b0z[j, k] * v[1, j, k]
-                + v[1, j, k] * (db0zdz[j, k] + db0rdr[j, k])
-                - v[0, j, k] * db0tdr[j, k]
-                + (v[0, j + 1, k] - v[0, j - 1, k])
-                / (2 * dr)
-                * (b0r[j, k] - b0t[j, k])
+        )
+        dv[1, j, k] += (dt / r * rho0[j, k]) * (
+            1j * m * p[j, k]
+            + 1
+            / mu
+            * (
+                b[2, j, k] * r * db0tdz[j, k]
+                + b0r[j, k] * (b[1, j, k] - 1j * m * b[0, j, k])
+                + b0z[j, k]
+                * (
+                    r * (b[1, j, k] - b[1, j, k - 1]) / (2 * dz)
+                    - 1j * m * b[2, j, k]
+                )
+                + r * b[0, j, k] * db0tdr[j, k]
+                + b[0, j, k] * b0t[j, k]
+                + (r * b0r[j, k]) * (b[1, j + 1, k] - b[1, j - 1, k]) / (2 * dr)
             )
+        )
 
     v += dv
     b += db
     p += dp
+    # Add diffusion?
+    add_diffusion = False
+    if add_diffusion:
+        for j in range(1, Mr - 1):
+            for k in range(1, Mz - 1):
+                v[:, j, k] += (
+                    # dt
+                    # * (1 * dv[:, j, k])
+                    0.1
+                    * (
+                        (v[:, j + 1, k] - 2 * v[:, j, k] + v[:, j - 1, k])
+                        # / (dr ** 2)
+                        + (v[:, j, k + 1] - 2 * v[:, j, k] + v[:, j, k - 1])
+                        # / (dz ** 2)
+                    )
+                )
+                b[:, j, k] += (
+                    # dt
+                    # * (1 * db[:, j, k])
+                    0.1
+                    * (
+                        (b[:, j + 1, k] - 2 * b[:, j, k] + b[:, j - 1, k])
+                        # / (dr ** 2)
+                        + (b[:, j, k + 1] - 2 * b[:, j, k] + b[:, j, k - 1])
+                        # / (dz ** 2)
+                    )
+                )

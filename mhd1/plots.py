@@ -7,7 +7,7 @@ import matplotlib.image as mpimg
 import numpy as np
 import tables
 
-from mhd1.models import MHDModel
+from mhd1.models import MHDModel, LinearMHDModel
 from mhd1.utils import save_plot
 
 
@@ -778,4 +778,282 @@ def mhd_snapshot(m: MHDModel, n: int):
     save_plot(f"mhd_snapshot_n_{n}.pdf")
     mng = plt.get_current_fig_manager()
     mng.window.state("zoomed")
+    plt.show()
+
+
+def snapshot_cylindrical_mhd(m: LinearMHDModel, plot_title="Animation", n=0):
+    """Plot initial axisymmetric configuration in cylindrical coordinates."""
+    c = m.c
+    d = m.d
+    fig, axes = plt.subplots(
+        ncols=3, nrows=2, constrained_layout=True, figsize=(12, 7)
+    )
+    ax_vr = axes[0, 0]
+    ax_vt = axes[0, 1]
+    ax_vz = axes[0, 2]
+    ax_br = axes[1, 0]
+    ax_bt = axes[1, 1]
+    ax_bz = axes[1, 2]
+    # ax_p = axes[2, 0]
+    for row in axes:
+        for ax in row:
+            ax.set_xlabel(r"$z$")
+            ax.set_ylabel(r"$r$")
+    ax_vr.set_title(r"$v_r$")
+    ax_vt.set_title(r"$v_\theta$")
+    ax_vz.set_title(r"$v_z$")
+    ax_br.set_title(r"$b_r$")
+    ax_bt.set_title(r"$b_\theta$")
+    ax_bz.set_title(r"$b_z$")
+    # ax_p.set_title(r"$p$")
+    with tables.open_file(d.h5_filename, mode="r") as f:
+        current_time = f.root.t[n]
+        v = np.real(f.root.v[n, :, :, :])
+        b = np.real(f.root.b[n, :, :, :])
+        vrmax = max(np.max(np.abs(v[0, :, :])), 10 ** -8)
+        vr = ax_vr.imshow(
+            v[0, :, :],
+            origin="lower",
+            vmin=-vrmax,
+            vmax=vrmax,
+        )
+        vtmax = max(np.max(np.abs(v[1, :, :])), 10 ** -8)
+        vt = ax_vt.imshow(
+            v[1, :, :],
+            origin="lower",
+            vmin=-vtmax,
+            vmax=vtmax,
+        )
+        vzmax = max(np.max(np.abs(v[2, :, :])), 10 ** -8)
+        vz = ax_vz.imshow(
+            v[2, :, :],
+            origin="lower",
+            vmin=-vzmax,
+            vmax=vzmax,
+        )
+        brmax = max(np.max(np.abs(b[0, :, :])), 10 ** -8)
+        br = ax_br.imshow(
+            b[0, :, :],
+            origin="lower",
+            vmin=-brmax,
+            vmax=brmax,
+        )
+        btmax = max(np.max(np.abs(b[1, :, :])), 10 ** -8)
+        bt = ax_bt.imshow(
+            b[1, :, :],
+            origin="lower",
+            vmin=-btmax,
+            vmax=btmax,
+        )
+        bzmax = max(np.max(np.abs(b[2, :, :])), 10 ** -8)
+        bz = ax_bz.imshow(
+            b[2, :, :],
+            origin="lower",
+            vmin=-bzmax,
+            vmax=bzmax,
+        )
+
+        # v = np.real(c.initial_v)
+        # b = np.zeros_like(v)
+        # b[0] += np.real(c.b0r)
+        # b[1] += np.real(c.b0t)
+        # b[2] += np.real(c.b0z)
+        # p = np.real(c.p0)
+        # vrmax = max(np.max(np.abs(v[0, :, :])), 10 ** -8)
+        # vr = ax_vr.imshow(v[0, :, :], origin="lower", vmin=-vrmax, vmax=vrmax)
+        # vtmax = max(np.max(np.abs(v[1, :, :])), 10 ** -8)
+        # vt = ax_vt.imshow(v[1, :, :], origin="lower", vmin=-vtmax, vmax=vtmax)
+        # vzmax = max(np.max(np.abs(v[2, :, :])), 10 ** -8)
+        # vz = ax_vz.imshow(v[2, :, :], origin="lower", vmin=-vzmax, vmax=vzmax)
+        # brmax = max(np.max(np.abs(b[0, :, :])), 10 ** -8)
+        # br = ax_br.imshow(b[0, :, :], origin="lower", vmin=-brmax, vmax=brmax)
+        # btmax = max(np.max(np.abs(b[1, :, :])), 10 ** -8)
+        # bt = ax_bt.imshow(b[1, :, :], origin="lower", vmin=-btmax, vmax=btmax)
+        # bzmax = max(np.max(np.abs(b[2, :, :])), 10 ** -8)
+        # bz = ax_bz.imshow(b[2, :, :], origin="lower", vmin=-bzmax, vmax=bzmax)
+        # pmax = max(np.max(np.abs(p[:, :])), 10 ** -8)
+        # pp = ax_p.imshow(p, origin="lower", vmin=-pmax, vmax=pmax)
+        plt.colorbar(vr, ax=ax_vr)
+        plt.colorbar(vt, ax=ax_vt)
+        plt.colorbar(vz, ax=ax_vz)
+        plt.colorbar(br, ax=ax_br)
+        plt.colorbar(bt, ax=ax_bt)
+        plt.colorbar(bz, ax=ax_bz)
+        plt.suptitle(
+            "Spheromak perturbation snapshots ($L/R=1.0$,"
+            f" $t={current_time:.3f}$)"
+        )
+        mng = plt.get_current_fig_manager()
+        # mng.window.state("zoomed")
+        save_plot(f"spheromak_snapshot_{n}.pdf")
+        # plt.show()
+
+
+def plot_initial_cylindrical_mhd(
+    m: LinearMHDModel,
+    plot_title="Animation",
+):
+    """Plot initial axisymmetric configuration in cylindrical coordinates."""
+    c = m.c
+    fig, axes = plt.subplots(
+        ncols=3, nrows=2, constrained_layout=True, figsize=(12, 7)
+    )
+    ax_vr = axes[0, 0]
+    ax_vt = axes[0, 1]
+    ax_vz = axes[0, 2]
+    ax_br = axes[1, 0]
+    ax_bt = axes[1, 1]
+    ax_bz = axes[1, 2]
+    # ax_p = axes[2, 0]
+    for row in axes:
+        for ax in row:
+            ax.set_xlabel(r"$z$")
+            ax.set_ylabel(r"$r$")
+    ax_vr.set_title(r"$v_r$")
+    ax_vt.set_title(r"$v_\theta$")
+    ax_vz.set_title(r"$v_z$")
+    ax_br.set_title(r"$B_r$")
+    ax_bt.set_title(r"$B_\theta$")
+    ax_bz.set_title(r"$B_z$")
+    # ax_p.set_title(r"$p$")
+    v = np.real(c.initial_v)
+    b = np.zeros_like(v)
+    b[0] += np.real(c.b0r)
+    b[1] += np.real(c.b0t)
+    b[2] += np.real(c.b0z)
+    p = np.real(c.p0)
+    vrmax = max(np.max(np.abs(v[0, :, :])), 10 ** -8)
+    vr = ax_vr.imshow(v[0, :, :], origin="lower", vmin=-vrmax, vmax=vrmax)
+    vtmax = max(np.max(np.abs(v[1, :, :])), 10 ** -8)
+    vt = ax_vt.imshow(v[1, :, :], origin="lower", vmin=-vtmax, vmax=vtmax)
+    vzmax = max(np.max(np.abs(v[2, :, :])), 10 ** -8)
+    vz = ax_vz.imshow(v[2, :, :], origin="lower", vmin=-vzmax, vmax=vzmax)
+    brmax = max(np.max(np.abs(b[0, :, :])), 10 ** -8)
+    br = ax_br.imshow(b[0, :, :], origin="lower", vmin=-brmax, vmax=brmax)
+    btmax = max(np.max(np.abs(b[1, :, :])), 10 ** -8)
+    bt = ax_bt.imshow(b[1, :, :], origin="lower", vmin=-btmax, vmax=btmax)
+    bzmax = max(np.max(np.abs(b[2, :, :])), 10 ** -8)
+    bz = ax_bz.imshow(b[2, :, :], origin="lower", vmin=-bzmax, vmax=bzmax)
+    # pmax = max(np.max(np.abs(p[:, :])), 10 ** -8)
+    # pp = ax_p.imshow(p, origin="lower", vmin=-pmax, vmax=pmax)
+    plt.colorbar(vr, ax=ax_vr)
+    plt.colorbar(vt, ax=ax_vt)
+    plt.colorbar(vz, ax=ax_vz)
+    plt.colorbar(br, ax=ax_br)
+    plt.colorbar(bt, ax=ax_bt)
+    plt.colorbar(bz, ax=ax_bz)
+    mng = plt.get_current_fig_manager()
+    # mng.window.state("zoomed")
+    save_plot("spheromak_initial_config.pdf")
+    plt.show()
+
+
+def animate_cylindrical_mhd(
+    m: LinearMHDModel,
+    plot_title="Animation",
+    repeat: bool = True,
+    add_equilibrium=True,
+):
+    """Animate the distribution over time, viewed from two orthogonal slices."""
+    if not m.has_run:
+        m.run()
+    c = m.c
+    d = m.d
+    frames = []
+    fig, axes = plt.subplots(
+        ncols=3, nrows=3, constrained_layout=True, figsize=(12, 10)
+    )
+    ax_vr = axes[0, 0]
+    ax_vt = axes[0, 1]
+    ax_vz = axes[0, 2]
+    ax_br = axes[1, 0]
+    ax_bt = axes[1, 1]
+    ax_bz = axes[1, 2]
+    ax_p = axes[2, 0]
+    ax_tt = axes[2, 2]
+    for row in axes:
+        for ax in row:
+            ax.set_xlabel(r"$z$")
+            ax.set_ylabel(r"$r$")
+    ax_vr.set_title(r"$v_r$")
+    ax_vt.set_title(r"$v_\theta$")
+    ax_vz.set_title(r"$v_z$")
+    ax_br.set_title(r"$b_r$")
+    ax_bt.set_title(r"$b_\theta$")
+    ax_bz.set_title(r"$b_z$")
+    ax_p.set_title(r"$p$")
+    with tables.open_file(d.h5_filename, mode="r") as f:
+        for n in range(f.root.t.shape[0]):
+            current_time = f.root.t[n]
+            v = np.real(f.root.v[n, :, :, :])
+            b = np.real(f.root.b[n, :, :, :])
+            p = np.real(f.root.p[n, :, :])
+            if add_equilibrium:
+                b[0] += np.real(c.b0r)
+                b[1] += np.real(c.b0t)
+                b[2] += np.real(c.b0z)
+                p += np.real(c.p0)
+            vrmax = max(np.max(np.abs(v[0, :, :])), 10 ** -8)
+            vr = ax_vr.imshow(
+                v[0, :, :],
+                origin="lower",
+                animated=True,
+                vmin=-vrmax,
+                vmax=vrmax,
+            )
+            vtmax = max(np.max(np.abs(v[1, :, :])), 10 ** -8)
+            vt = ax_vt.imshow(
+                v[1, :, :],
+                origin="lower",
+                animated=True,
+                vmin=-vtmax,
+                vmax=vtmax,
+            )
+            vzmax = max(np.max(np.abs(v[2, :, :])), 10 ** -8)
+            vz = ax_vz.imshow(
+                v[2, :, :],
+                origin="lower",
+                animated=True,
+                vmin=-vzmax,
+                vmax=vzmax,
+            )
+            brmax = max(np.max(np.abs(b[0, :, :])), 10 ** -8)
+            br = ax_br.imshow(
+                b[0, :, :],
+                origin="lower",
+                animated=True,
+                vmin=-brmax,
+                vmax=brmax,
+            )
+            btmax = max(np.max(np.abs(b[1, :, :])), 10 ** -8)
+            bt = ax_bt.imshow(
+                b[1, :, :],
+                origin="lower",
+                animated=True,
+                vmin=-btmax,
+                vmax=btmax,
+            )
+            bzmax = max(np.max(np.abs(b[2, :, :])), 10 ** -8)
+            bz = ax_bz.imshow(
+                b[2, :, :],
+                origin="lower",
+                animated=True,
+                vmin=-bzmax,
+                vmax=bzmax,
+            )
+            pp = ax_p.imshow(p, origin="lower", animated=True)
+            time_text = ax_tt.text(
+                0.5,
+                0.5,
+                f"t={current_time:.3f}",
+                transform=ax_tt.transAxes,
+                animated=True,
+            )
+            frames.append([vr, vt, vz, br, bt, bz, pp, time_text])
+
+    ani = animation.ArtistAnimation(
+        fig, frames, interval=150, blit=True, repeat_delay=1000, repeat=repeat
+    )
+    mng = plt.get_current_fig_manager()
+    # mng.window.state("zoomed")
     plt.show()

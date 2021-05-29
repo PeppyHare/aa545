@@ -1,3 +1,11 @@
+# Linearized Ideal MHD Stability Analysis
+
+This module implements an axisymmetric finite difference solver for the linearized ideal MHD equations. The solver is applied to a force-free spheromak configuration to determine the stability criterion (as a function of L/R).
+
+## Running the Script
+
+To run the investigation, execute the `run_spheromak_equilibrium.py` script. Requires a Python install (NumPy 1.20.2 supports either Python 3.7 or Python 3.8) with either `pip` or `poetry` for depdency installation. To install dependencies, follow the appropriate section:
+
 # Ideal MHD 3D MacCormack Finite Difference Integrator
 
 This module implements a Lax-Wendroff type finite difference method to solve the nonlinear, time-dependent ideal MHD equations. Two test problems are used to validate the model:
