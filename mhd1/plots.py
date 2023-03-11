@@ -181,7 +181,7 @@ def plot_initial_distribution_all_axes(m: MHDModel):
     plt.colorbar(bz_yz, ax=[ax_bz_xy, ax_bz_yz])
     save_plot("initial_configuration.pdf")
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.show()
 
 
@@ -288,7 +288,7 @@ def plot_initial_distribution_xy(m: MHDModel):
     ax_b_xy.set_ylabel(r"$y$")
     plt.title(r"$B_\theta$")
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.show()
 
 
@@ -588,7 +588,7 @@ def animate_mhd(m: MHDModel, plot_title="Animation", repeat: bool = True):
         fig, frames, interval=2, blit=True, repeat_delay=1000
     )
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.show()
 
 
@@ -777,7 +777,7 @@ def mhd_snapshot(m: MHDModel, n: int):
 
     save_plot(f"mhd_snapshot_n_{n}.pdf")
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.show()
 
 

@@ -14,7 +14,7 @@ import mhd1.plots as plots
 
 
 plt.style.use("dark_background")  # For comfortable nighttime coding
-demo_mode = True
+demo_mode = False
 
 
 class RiemannShockConfiguration(Configuration):
