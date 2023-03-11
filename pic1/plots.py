@@ -54,7 +54,7 @@ def plot_energy_history(
     ax_energy = fig.add_subplot(2, 1, (1, 2))
     _plot_energy_ax(m, ax_energy, title=plot_title)
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.tight_layout()
     now_seconds = (
         datetime.datetime.now()
@@ -160,7 +160,7 @@ def plot_initial_distribution(m: PicModel, hold=True):
     save_plot(f"initial_hist_{c.N}_particles.pdf")
     if hold:
         mng = plt.get_current_fig_manager()
-        mng.window.state("zoomed")
+        # mng.window.state("zoomed")
         plt.show()  # Waits for user to close the plot
 
 
@@ -227,7 +227,7 @@ def plot_snapshots_velocity_phase_space(
             ax_xv.set_xlabel("$v_x$")
         idx += 1
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.tight_layout()
     save_plot(filename)
     if hold:
@@ -287,7 +287,7 @@ def plot_snapshots_velocity(
     ax_fv.legend()
     plt.yscale("log")
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.tight_layout()
     save_plot(f"fvx_hist_{N}_particles.pdf")
     if hold:
@@ -360,7 +360,7 @@ def plot_snapshots(
             ax_xv.set_xlabel("x")
         idx += 1
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     plt.tight_layout()
     save_plot(filename)
     if hold:
@@ -443,7 +443,7 @@ def plot_traces(
     _plot_energy_ax(m, ax_energy)
     plt.tight_layout()
     mng = plt.get_current_fig_manager()
-    mng.window.state("zoomed")
+    # mng.window.state("zoomed")
     save_plot(f"traces_{N}_particles.pdf")
     if hold:
         plt.show()  # Waits for user to close the plots
@@ -654,11 +654,11 @@ def animate_phase_space(
     plt.tight_layout()
     if hold:
         mng = plt.get_current_fig_manager()
-        mng.window.state("zoomed")
+        # mng.window.state("zoomed")
         plt.show()  # Waits for user to close the plot
     else:
         mng = plt.get_current_fig_manager()
-        mng.window.state("zoomed")
+        # mng.window.state("zoomed")
         create_folder(os.path.join(os.getcwd(), "plots", "pic1"))
         now_seconds = (
             datetime.datetime.now()

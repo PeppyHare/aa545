@@ -1,21 +1,18 @@
 [tool.poetry]
 name = "pic1"
-version = "0.2.0"
+version = "0.1.0"
 description = "Coding project 1.1: One-dimensional electrostatic PIC modeling."
 authors = ["Evan Bluhm <embluhm@uw.edu>"]
+readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.7,<3.9"
-matplotlib = "^3.4.1"
-numpy = "^1.20.2"
-numba = "^0.53.1"
+python = "^3.9,<3.12"
+numba = "^0.56.4"
+matplotlib = "^3.7.1"
 progressbar = "^2.5"
-scipy = "^1.6.2"
+scipy = "^1.10.1"
 
 
-[tool.poetry.dev-dependencies]
-flake8 = "^3.9.1"
-pytest = "^6.2.3"
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

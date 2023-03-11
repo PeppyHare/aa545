@@ -92,7 +92,7 @@ def calc_growth_rate(
     if demo_mode:
         m = load_data(
             os.path.join(
-                "saved_data", "pic1", "2021-05-23_58182.70761_two-beam-data.p"
+                "saved_data", "pic1", "2023-03-10_77867.011021_two-beam-data"
             )
         )
         c = m.c
@@ -180,7 +180,7 @@ def calc_growth_rate(
         ax_field.set_ylabel(r"$E$")
         ax_field.set_xlabel(r"$x$")
         mng = plt.get_current_fig_manager()
-        mng.window.state("zoomed")
+        # mng.window.state("zoomed")
         save_plot(f"two_stream_initial_density_k={k}.pdf")
         plt.show()
 
